@@ -1,3 +1,4 @@
+import re
 def corpus(corppath,semmap,phonmap,phonmap_label,phon_label):
     CORPUS = {}
     with open(corppath, 'r') as f:
@@ -53,34 +54,7 @@ def semantics(sempath):
             SEM_MAP.append([int(x) for x in tmp[1:]])
     return SEM_MAP
 
-def altpronunciation(CORPUS, plabel, rulelist, PHON_MAP, rootphon='SAE'):
-    from aae import rules
-    changelog = {k:[] for k in rulelist}
-    for word, d in CORPUS.items():
-        RuleApplied = False
-        phon_code,dashes = stripdash(d['phon_code'][rootphon])
-        for r in rulelist:
-            rule = getattr(rules, r)
-            b,phon_code = rule(phon_code)
-            RuleApplied = RuleApplied or b
-            if b:
-                changelog[r].append(word)
-
-        phon_code = applydash(phon_code,dashes)
-        phon = []
-        for x in phon_code:
-            phon.append(PHON_MAP[x])
-
-        if RuleApplied:
-            CORPUS[word]['phon_code'][plabel] = phon_code
-            CORPUS[word]['phon'][plabel] = phon
-        else:
-            CORPUS[word]['phon_code'][plabel] = CORPUS[word]['phon_code'][rootphon]
-            CORPUS[word]['phon'][plabel] = CORPUS[word]['phon'][rootphon]
-    return (CORPUS,changelog)
-
 def stripdash(p_):
-    import re
     # Record dashes
     pat = re.compile('_+')
     dashes = pat.findall(p_)

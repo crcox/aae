@@ -1,4 +1,4 @@
-from aae import phoncodes
+import aae
 import re
 
 # DEVOICING
@@ -16,7 +16,7 @@ def devoice(p):
     plist = list(p)
     b = False
     try:
-        if p[-2] in phoncodes.vowels and p[-1] in devoicing_rules.keys():
+        if p[-2] in aae.phoncodes.vowels and p[-1] in devoicing_rules.keys():
             plist[-1] = devoicing_rules[p[-1]]
             p = ''.join(plist)
             b = True
@@ -32,7 +32,7 @@ def consonant_cluster_reduction(p):
     plist = list(p)
     b = False
     try:
-        if p[-2] in phoncodes.consonants and p[-1] in ['t','d','s','z']:
+        if p[-2] in aae.phoncodes.consonants and p[-1] in ['t','d','s','z']:
             plist[-1] = '_'
             p = ''.join(plist)
             b = True
@@ -47,7 +47,7 @@ def postvocalic_reduction(p):
     plist = list(p)
     b = False
     try:
-        if p[-2] in phoncodes.vowels and p[-1] == 'r':
+        if p[-2] in aae.phoncodes.vowels and p[-1] == 'r':
             plist[-1] = '_'
             p = ''.join(plist)
             b = True
