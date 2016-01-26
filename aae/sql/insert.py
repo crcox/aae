@@ -1,4 +1,5 @@
 import sqlite3
+import aae
 # N.B. SQL statements built with the Python "string".format() method are not
 # protected against SQL Injection Attacks. This code is not intended to be web
 # hosted or to record sensitive information.
@@ -19,7 +20,7 @@ def words(conn, corpus, word_labels):
 
     """
     cmd_select = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1"
-    cmd_insert = "INSERT INTO word (corpus_id, word) VALUES "
+    cmd_insert = "INSERT INTO word (corpus_id, word) VALUES (?, ?)"
     values = []
     # In the event of an exception, the transaction is rolled back; otherwise,
     # the transaction is committed.
@@ -30,14 +31,17 @@ def words(conn, corpus, word_labels):
         r = cur.fetchone()
         corpus_id = r['id']
         # Compose a string of multiple insert values
-        values = ','.join(
-                ["({corpus_id},{word},{ortho})".format(corpus_id=corpus_id,word=w)
-                    for w in word_labels]
-                )+';'
-        # Append insert values to the rest of the insert command
-        cmd_insert += values
+#        values = ','.join(
+#                ["({corpus_id},{word})".format(corpus_id=corpus_id,word=w)
+#                    for w in word_labels]
+#                )+';'
+#        # Append insert values to the rest of the insert command
+#        cmd_insert += values
+
+        values = zip([corpus_id]*len(word_labels), word_labels)
+
         # Execute insert command
-        cur.execute(cmd_insert)
+        cur.executemany(cmd_insert, values)
 
 def corpus(conn, label, description='', word_labels=[]):
     """
@@ -51,72 +55,69 @@ def corpus(conn, label, description='', word_labels=[]):
 
     # Register a corpus, and also insert a list of words
     >>> words = ["apple","banana","carrot"]
-    >>> ortho = ["_apple","banana","carrot"]
-    >>> aae.sql.insert.corpus(conn, "abc", words=words)
+    >>> aae.sql.insert.corpus(conn, "abc", word_labels=words)
 
     """
     cmd_insert = "INSERT INTO corpus (label, description) VALUES (:label,:desc)"
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert, {'label': corpus, 'desc': description})
+        cur.execute(cmd_insert, {'label': label, 'desc': description})
 
     if word_labels:
         words(conn, label, word_labels)
 
-def phoneme_representations(conn, dialect, phonmap):
+def phoneme_representations(conn, accent, phonmap, verbose=False):
     """
-    Insert dialect into database.
+    Insert accent into database.
 
-    # Register a dialect
+    # Register a accent
     >>> aae.sql.insert.corpus(conn, "standard")
 
-    # Register a dialect with a description
+    # Register a accent with a description
     >>> aae.sql.insert.corpus(conn, "mild", "Only vowels differ from standard.")
     >>> aae.sql.insert.corpus(conn, "strong", "Both vowels and consonants differ from standard.")
 
     """
-    cmd_insert = "INSERT INTO phonrep (phoneme_id,dialect_id,unit,value) VALUES (:phoneme_id,:dialect_id,:unit,:value)"
-    cmd_select_dialect_id = "SELECT id FROM dialect WHERE label=:dialect LIMIT 1"
-    cmd_select_phoneme_id = "SELECT id FROM phoneme WHERE phoneme=:phoneme LIMIT 1"
+    cmd_insert = "INSERT INTO phonrep (phoneme_id,accent_id,unit,value) VALUES (?,?,?,?);"
+    cmd_select_accent_id = "SELECT id FROM accent WHERE label=:accent LIMIT 1;"
+    cmd_select_phoneme_id = "SELECT id FROM phoneme WHERE phoneme=:phoneme LIMIT 1;"
     values = []
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_select_dialect_id, {'dialect': dialect})
+        cur.execute(cmd_select_accent_id, {'accent': accent})
         r = cur.fetchone()
-        dialect_id = r['id']
+        accent_id = r['id']
         for phoneme,representation in phonmap.items():
-            try:
-                cur.execute(cmd_select_phoneme_id, {'phoneme': phoneme})
-            except sqlite3.DataError:
-                print "Adding phoneme `"+phoneme+"` to database."
+            cur.execute(cmd_select_phoneme_id, {'phoneme': phoneme})
+            r = cur.fetchone()
+            if r is None:
+                if verbose:
+                    print "Adding phoneme `"+phoneme+"` to database."
                 phonemes(conn, phoneme)
                 cur.execute(cmd_select_phoneme_id, {'phoneme': phoneme})
+                r = cur.fetchone()
 
-            r = cur.fetchone()
             phoneme_id = r['id']
-            values.extend(
-                    ["({dialect_id},{phoneme_id},{unit},{value})".format(dialect_id=dialect_id,phoneme_id=word_id,unit=i,value=v)
-                        for i,v in enumerate(representation)]
-                    )
-        cmd_insert += ','.join(values)+';'
-        cur.execute(cmd_insert)
+            n = len(representation)
+            values.extend(zip([accent_id]*n, [phoneme_id]*n, range(n), representation))
+        cur.executemany(cmd_insert, values)
 
-def dialect(conn, label, description='', phonmap={}):
+def accent(conn, label, description='', phonmap={}):
     """
-    Insert dialect into database.
+    Insert accent into database.
 
-    # Register a dialect
-    >>> aae.sql.insert.dialect(conn, "standard")
+    # Register a accent
+    >>> aae.sql.insert.accent(conn, "standard")
 
-    # Register a dialect with a description
-    >>> aae.sql.insert.dialect(conn, "mild", "Only vowels differ from standard.")
-    >>> aae.sql.insert.dialect(conn, "strong", "Both vowels and consonants differ from standard.")
+    # Register a accent with a description
+    >>> aae.sql.insert.accent(conn, "mild", "Only vowels differ from standard.")
+    >>> aae.sql.insert.accent(conn, "strong", "Both vowels and consonants differ from standard.")
 
     """
-    cmd_insert = "INSERT INTO dialect (label, description) VALUES (:label,:desc)"
+    cmd_insert = "INSERT INTO accent (label, description) VALUES (:label,:desc)"
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert, {'label': dialect, 'desc': description})
+        cur.execute(cmd_insert, {'label': label, 'desc': description})
 
     if phonmap:
         phoneme_representations(conn, label, phonmap)
@@ -126,10 +127,10 @@ def rule(conn, label, description=''):
     Insert a rule into the database.
 
     What is stored in the database is just a label so that words within
-    languages can be tagged. In this corpus, different languages are derived
+    dialects can be tagged. In this corpus, different dialects are derived
     from SAE by applying rules. The rule itself is an algorithm, and cannot be
     stored in the database. However, by maintaining a table of rule names the
-    influence of each rule on particular words within languages can be tracked.
+    influence of each rule on particular words within dialects can be tracked.
 
     # Register a rule with a description.
     >>> aae.sql.insert.rule(conn, "devoice","Final phonemes /b/, /d/, /v/, or /z/ replaced with /p/, /t/, /f/, and /s/, respectively, if preceded by a vowel. ")
@@ -140,11 +141,11 @@ def rule(conn, label, description=''):
     cmd_insert = "INSERT INTO rule (label, description) VALUES (:label,:desc)"
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert, {'label': dialect, 'desc': description})
+        cur.execute(cmd_insert, {'label': label, 'desc': description})
 
-def language_has_rules(conn, language_label, has_rules):
+def dialect_has_rules(conn, dialect_label, has_rules, verbose=False):
     """
-    Insert relationship between a language and one or more rules.
+    Insert relationship between a dialect and one or more rules.
 
     # Insert one rule. [] are required.
     >>> aae.sql.insert.rule(conn, "AAE", ["devoice"])
@@ -153,42 +154,41 @@ def language_has_rules(conn, language_label, has_rules):
     >>> aae.sql.insert.rule(conn, "AAE", ["devoice", "consonant_cluster_reduction"])
 
     """
-    cmd_select_language_id = "SELECT id FROM language WHERE label=:language LIMIT 1"
+    cmd_select_dialect_id = "SELECT id FROM dialect WHERE label=:dialect LIMIT 1"
     cmd_select_rule_id = "SELECT id FROM rule WHERE label=:rule LIMIT 1"
-    cmd_insert = "INSERT INTO language_has_rule (language_id,rule_id) VALUES (:lid,:rid)"
+    cmd_insert = "INSERT INTO dialect_has_rule (dialect_id,rule_id) VALUES (:lid,:rid)"
     with conn:
         cur = conn.cursor()
-        # Lookup the language id to use as foreign key
-        cur.execute(cmd_select_language_id, {'language': language_label})
+        # Lookup the dialect id to use as foreign key
+        cur.execute(cmd_select_dialect_id, {'dialect': dialect_label})
         r = cur.fetchone()
-        language_id = r['id']
+        dialect_id = r['id']
         for rule_label in has_rules:
             # Lookup the rule id to use as foreign key
-            try:
-                cur.execute(cmd_select_rule_id, {'phoneme': phoneme})
-            except sqlite3.DataError:
-                print "Adding rule `"+rule+"` to database."
-                rule(conn, rule_label)
-                cur.execute(cmd_select_phoneme_id, {'phoneme': phoneme})
-                cur.execute(cmd_select_rule_id, {'phoneme': phoneme})
-            cur.execute(cmd_select_rule, {'rule': rule})
+            cur.execute(cmd_select_rule_id, {'rule': rule_label})
             r = cur.fetchone()
+            if r is None:
+                if verbose:
+                    print "Adding rule `"+rule+"` to database."
+                rule(conn, rule_label)
+                cur.execute(cmd_select_rule_id, {'rule': rule_label})
+                r = cur.fetchone()
             rule_id = r['id']
             # Execute insert command
-            cur.execute(cmd_insert, {'lid': language_id, 'rid': rule_id})
+            cur.execute(cmd_insert, {'lid': dialect_id, 'rid': rule_id})
 
-def language(conn, label, description='', has_rules=[]):
+def dialect(conn, label, description='', has_rules=[]):
     """
-    Insert a language into the database.
+    Insert a dialect into the database.
 
     """
-    cmd_insert = "INSERT INTO language (label, description) VALUES (:label,:desc)"
+    cmd_insert = "INSERT INTO dialect (label, description) VALUES (:label,:desc)"
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert, {'label': dialect, 'desc': description})
+        cur.execute(cmd_insert, {'label': label, 'desc': description})
 
     if has_rules:
-        language_has_rules(conn, label, has_rules)
+        dialect_has_rules(conn, label, has_rules)
 
 def phonemes(conn, phonemes):
     """
@@ -201,16 +201,17 @@ def phonemes(conn, phonemes):
     >>> aae.sql.insert.phonemes(conn, ["^", "a"])
 
     """
-    cmd_insert = "INSERT INTO phoneme (phoneme) VALUES "
-    values = ','.join(phonemes)+';'
-    cmd_insert += values
+    cmd_insert = "INSERT INTO phoneme (phoneme) VALUES (?);"
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert)
+        if isinstance(phonemes, list):
+            cur.executemany(cmd_insert, phonemes)
+        else:
+            cur.execute(cmd_insert, phonemes)
 
-def phonology(conn, corpus_label, language_label, phoncodemap):
+def phonology(conn, corpus_label, dialect_label, phoncodemap):
     """
-    Insert phonological transcription code for words within a language.
+    Insert phonological transcription code for words within a dialect.
 
     # Insert phoncode for one word
     >>> aae.sql.insert.phonology(conn, "3k", "SAE", {"fawn": "__fan_____"})
@@ -219,60 +220,99 @@ def phonology(conn, corpus_label, language_label, phoncodemap):
     >>> aae.sql.insert.phonology(conn, "3k", "SAE", {"fawn": "__fan_____", "foul": "__fWl_____"})
 
     """
-    cmd_select_language_id = "SELECT id FROM language WHERE label=:language LIMIT 1"
-    cmd_select_corpus_id = "SELECT id FROM corpus WHERE corpus=:corpus LIMIT 1"
-    cmd_select_word_id = "SELECT id FROM word WHERE word=:word AND corpus_id=:corpus_id LIMIT 1"
-    cmd_insert = "INSERT INTO phonology (corpus_id,language_id,word_id,phoncode) VALUES "
+    cmd_select_dialect_id = "SELECT id FROM dialect WHERE label=:dialect LIMIT 1;"
+    cmd_select_corpus_id = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1;"
+    cmd_select_word_id = "SELECT id FROM word WHERE word=:word AND corpus_id=:corpus_id LIMIT 1;"
+    cmd_select_word_ids = "SELECT id FROM word WHERE corpus_id=? AND word IN (?);"
+    cmd_select_phonology = "SELECT id FROM phonology WHERE phoncode=:phoncode LIMIT 1;"
+    cmd_select_rules = "SELECT id,label FROM rule JOIN dialect_has_rule ON rule.id=dialect_has_rule.rule_id WHERE dialect_id=:dialect_id;"
+    cmd_insert_phonology = "INSERT INTO phonology (phoncode) VALUES (?);"
+    cmd_insert_phonology_has_rule = "INSERT INTO phonology_has_rule (dialect_id, word_id, phonology_id, rule_id) VALUES (?,?,?,?);"
+    # cmd_insert_homo = "INSERT INTO homophones (corpus_id,word_id,homo_id) VALUES (?,?,?);"
+    cmd_insert_word_has_phonology = "INSERT INTO word_has_phonology (word_id,dialect_id,phonology_id) VALUES (?,?,?);"
+    cmd_insert_dialect_has_phonology = "INSERT INTO dialect_has_phonology (dialect_id,phonology_id) VALUES (?,?);"
+
+    def applyrules(phoncode, rulelist):
+        """
+        Rules will be applied in order, and effects will accumulate.
+
+        """
+        phoncode,dashes = aae.parse.stripdash(phoncode)
+        rules_applied = []
+        for r in rulelist:
+            rule = getattr(aae.rules, r['label'])
+            phoncode_new = rule(phoncode)
+            if phoncode_new:
+                rules_applied.append(r['id'])
+                phoncode = phoncode_new
+
+        phoncode = aae.parse.applydash(phoncode,dashes)
+        return (phoncode, rules_applied)
+
     values = []
+    homophones = []
+    dialect_has_phonology_values = []
+    word_has_phonology_values = []
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_select_language_id, {'language': language_label})
+        cur.execute(cmd_select_dialect_id, {'dialect': dialect_label})
         r = cur.fetchone()
-        language_id = r['id']
-        for word,phoncode in phonology_phoncode.items():
+        dialect_id = r['id']
+        print '************ ' + str(dialect_id)
+        cur.execute(cmd_select_rules, {'dialect_id': dialect_id})
+        rules = cur.fetchall()
+
+        for word,phoncode in phoncodemap.items():
+            rules_applied = []
+            if rules:
+                phoncode, rules_applied = applyrules(phoncode, rules)
             cur.execute(cmd_select_corpus_id, {'corpus': corpus_label})
+            r = cur.fetchone()
             corpus_id = r['id']
             cur.execute(cmd_select_word_id, {'word': word, 'corpus_id': corpus_id})
             r = cur.fetchone()
             word_id = r['id']
-            values.append("({corpus_id},{language_id},{word_id},{phoncode})".format(corpus_id=corpus_id,language_id=language_id,word_id=word_id,phoncode=phoncode))
-        cmd_insert += ','.join(values)+';'
-        cur.execute(cmd_insert)
+            try:
+                cur.execute(cmd_insert_phonology, (phoncode,))
+            except sqlite3.IntegrityError:
+                # Phonology already exists in database.
+                pass
+            cur.execute(cmd_select_phonology, {'phoncode': phoncode})
+            r = cur.fetchone();
+            phoncode_id = r['id']
+            word_has_phonology_values.append((word_id,dialect_id,phoncode_id))
+            dialect_has_phonology_values.append((dialect_id,phoncode_id))
 
-def phonology_has_rule(conn, language_label, phonology_phoncode, rule):
-    """
-    Insert relationship between a rule application and a non-standard
-    phonological transcription code within a language.
+            if rules_applied:
+                n = len(rules_applied)
+                phon_has_rules_values = zip([dialect_id]*n,[word_id]*n,[phoncode_id]*n,rules_applied)
+                cur.executemany(cmd_insert_phonology_has_rule, phon_has_rules_values)
 
-    # Insert relationship between one phonological transcription and one rule.
-    >>> aae.sql.insert.phonology_has_rule(conn, "AAE", ["str@n_____"], "consonant_cluster_reduction")
+#            homo = [w for w,p in phoncodemap.items() if p == phoncode and w is not word]
+#            cur.execute(cmd_select_word_ids, (corpus_id, ','.join(homo)))
+#            r = cur.fetchall()
+#            homo_id = [h['id'] for h in r]
+#            if homo:
+#                homophones.extend(zip([corpus_id]*len(r),[word_id]*len(r),homo_id))
 
-    # Insert relationship between multiple phonological transcriptions and one rule.
-    >>> aae.sql.insert.phonology_has_rule(conn, "AAE", ["str@n_____", "__rWn_____"], "consonant_cluster_reduction")
+        for row in word_has_phonology_values:
+            try:
+                cur.execute(cmd_insert_word_has_phonology, row)
+            except sqlite3.IntegrityError:
+                # The phonology is the same in multiple dialects.
+                pass
 
-    """
-    cmd_select_language_id = "SELECT id FROM language WHERE label=:language LIMIT 1"
-    cmd_select_rule_id = "SELECT id FROM rule WHERE label=:rule LIMIT 1"
-    cmd_select_phonology_id = "SELECT id FROM phonology WHERE language_id=:language_id AND phoncode IN (" + ",".join("?"*len(phonology_phoncode)) + ")"
-    cmd_insert = "INSERT INTO phonology_has_rule (rule_id,phonology_id) VALUES "
-    with conn:
-        cur = conn.cursor()
-        cur.execute(cmd_select_language_id, {'language': language_label})
-        r = cur.fetchone()
-        language_id = r['id']
-        cur.execute(cmd_select_rule_id, {'rule': rule})
-        r = cur.fetchone()
-        rule_id = r['id']
-        cur.execute(cmd_select_phonology_id, phonology_phoncode)
-        R = cur.fetchall()
-        values = ','.join(
-                ["({rule_id},{phon_id})".format(rule_id=rule_id,phon_id=r['id'])
-                    for r in R]
-                )+';'
-        cmd_insert += values
-        cur.execute(cmd_insert)
+        for row in dialect_has_phonology_values:
+            try:
+                cur.execute(cmd_insert_dialect_has_phonology, row)
+            except sqlite3.IntegrityError:
+                # The phonology is homophonic or the same in multiple dialects.
+                pass
 
-def phonology_has_phonemes(conn, update=False):
+#        if homophones:
+#            cur.executemany(cmd_insert_homo, homophones)
+
+def phonology_has_phonemes(conn, update=False, verbose=False):
     """
     Insert relationships between all phonological transcriptions (strings), and
     their contituent phonemes. Necessary to produce phonological representations
@@ -287,14 +327,14 @@ def phonology_has_phonemes(conn, update=False):
     >>> aae.sql.insert.phonology_has_phonemes(conn, update=True)
 
     """
-    cmd_insert = "INSERT INTO phonology_has_phoneme (phonology_id,phoneme_id,unit) VALUES "
+    cmd_insert = "INSERT INTO phonology_has_phoneme (phonology_id,phoneme_id,unit) VALUES (?,?,?);"
     values = []
     existing_phonology_id = []
     with conn:
         cur = conn.cursor()
         if not update:
-            cur.execute("SELECT DISTINCT phonology_id FROM phonology_has_phoneme")
-            existing_phonology_id = [r['id'] for r in cur.fetchall()]
+            cur.execute("SELECT DISTINCT phonology_id FROM phonology_has_phoneme;")
+            existing_phonology_id = [r['phonology_id'] for r in cur.fetchall()]
 
         cur.execute("SELECT id, phoneme FROM phoneme;")
         phoneme_to_id = dict([(r['phoneme'],r['id']) for r in cur.fetchall()])
@@ -303,13 +343,18 @@ def phonology_has_phonemes(conn, update=False):
             # if update == True, existing_phonology_id is empty, so statement
             # always evaluates to True.
             if not r['id'] in existing_phonology_id:
-                values.extend(
-                        ["({phonology_id},{phoneme_id},{unit})".format(
-                            phonology_id=r['id'],phoneme_id=phoneme_to_id[p],unit=i)
-                            for p in r['phoncode']])
-
-        cmd_insert += ','.join(values)+';'
-        cur.execute(cmd_insert)
+                phoncode = r['phoncode']
+                phonology_id = r['id']
+                phoneme_ids = [phoneme_to_id[p] for p in phoncode]
+                n = len(phoncode)
+                if verbose:
+                    print "-"*20
+                    print '|'.join(["{x:>2}".format(x=s) for s in phoncode])
+                    print '|'.join(["{x:02d}".format(x=d) for d in phoneme_ids])
+                    print "phonology_id: " + str(phonology_id)
+                row = zip([phonology_id]*n, phoneme_ids, range(n))
+                values.extend(row)
+        cur.executemany(cmd_insert, values)
 
 def semantic_representation(conn, corpus_label, semmap):
     """
@@ -322,9 +367,9 @@ def semantic_representation(conn, corpus_label, semmap):
     >>> aae.sql.insert.semantic_representation(conn, "3k", {"apple": [0,1,1,0], "banana": [1,1,1,0]})
 
     """
-    cmd_select_corpus_id = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1"
-    cmd_select_word_id = "SELECT id FROM word WHERE word=:word AND corpus_id=:corpus_id LIMIT 1"
-    cmd_insert = "INSERT INTO semrep (corpus_id,word_id,unit,value) VALUES "
+    cmd_select_corpus_id = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1;"
+    cmd_select_word_id = "SELECT id FROM word WHERE word=:word AND corpus_id=:corpus_id LIMIT 1;"
+    cmd_insert = "INSERT INTO semrep (corpus_id,word_id,unit,value) VALUES (?,?,?,?);"
     values = []
     with conn:
         cur = conn.cursor()
@@ -335,9 +380,276 @@ def semantic_representation(conn, corpus_label, semmap):
             cur.execute(cmd_select_word_id, {'word': word, 'corpus_id': corpus_id})
             r = cur.fetchone()
             word_id = r['id']
-            values.extend(
-                    ["({corpus_id},{word_id},{unit},{value})".format(corpus_id=corpus_id,word_id=word_id,unit=i,value=v)
-                        for i,v in enumerate(representation)]
-                    )
-        cmd_insert += ','.join(values)+';'
-        cur.execute(cmd_insert)
+            n = len(representation)
+            values = zip([corpus_id]*n,[word_id]*n,range(n),representation)
+            cur.executemany(cmd_insert, values)
+
+def orthography(conn, corpus_label, orthcodemap):
+    """
+    Insert orthographic transcription code for words within a dialect.
+
+    # Insert orthcode for one word
+    >>> aae.sql.insert.orthography(conn, "3k", "orthogonal", {"fawn": "__fan_____"})
+
+    # Insert orthcode for multiple words.
+    >>> aae.sql.insert.orthography(conn, "3k", "orthogonal", {"fawn": "__fan_____", "foul": "__fWl_____"})
+
+    """
+    cmd_select_corpus_id = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1;"
+    cmd_select_word_id = "SELECT id FROM word WHERE word=:word AND corpus_id=:corpus_id LIMIT 1;"
+    cmd_insert = "INSERT INTO orthography (corpus_id,word_id,orthcode) VALUES (?,?,?);"
+    values = []
+    with conn:
+        cur = conn.cursor()
+        for word,orthcode in orthcodemap.items():
+            cur.execute(cmd_select_corpus_id, {'corpus': corpus_label})
+            r = cur.fetchone()
+            corpus_id = r['id']
+            cur.execute(cmd_select_word_id, {'word': word, 'corpus_id': corpus_id})
+            r = cur.fetchone()
+            word_id = r['id']
+            values.append((corpus_id,word_id,orthcode))
+        cur.executemany(cmd_insert, values)
+
+def graphemes(conn, graphemes):
+    """
+    Insert word into database and associate with a corpus.
+
+    # Insert one phoneme. [] are required.
+    >>> aae.sql.insert.graphemes(conn, ["^"])
+
+    # Insert multiple rules.
+    >>> aae.sql.insert.graphemes(conn, ["^", "a"])
+
+    """
+    cmd_insert = "INSERT INTO grapheme (grapheme) VALUES (?);"
+    with conn:
+        cur = conn.cursor()
+        if isinstance(graphemes, list):
+            cur.executemany(cmd_insert, graphemes)
+        else:
+            cur.execute(cmd_insert, graphemes)
+
+def orthography_has_graphemes(conn, update=False, verbose=False):
+    """
+    Insert relationships between all phonological transcriptions (strings), and
+    their contituent phonemes. Necessary to produce phonological representations
+    for complete utterances.
+
+    # Insert all relationships between phonological transcriptions and phonemes
+    # that do not already exist.
+    >>> aae.sql.insert.phonology_has_phonemes(conn)
+
+    # Insert all relationships between phonological transcriptions and
+    # phonemes, updating existing ones.
+    >>> aae.sql.insert.phonology_has_phonemes(conn, update=True)
+
+    """
+    cmd_insert = "INSERT INTO orthography_has_grapheme (orthography_id,grapheme_id,unit) VALUES (?,?,?);"
+    values = []
+    existing_phonology_id = []
+    with conn:
+        cur = conn.cursor()
+        if not update:
+            cur.execute("SELECT DISTINCT orthography_id FROM orthography_has_grapheme;")
+            existing_orthography_id = [r['orthography_id'] for r in cur.fetchall()]
+
+        cur.execute("SELECT id, grapheme FROM grapheme;")
+        grapheme_to_id = dict([(r['grapheme'],r['id']) for r in cur.fetchall()])
+        cur.execute("SELECT id, orthcode FROM orthography;")
+        for r in cur.fetchall():
+            # if update == True, existing_phonology_id is empty, so statement
+            # always evaluates to True.
+            if not r['id'] in existing_orthography_id:
+                orthcode = r['orthcode']
+                orthography_id = r['id']
+                grapheme_ids = [grapheme_to_id[g] for g in orthcode]
+                n = len(orthcode)
+                if verbose:
+                    print "-"*20
+                    print '|'.join(["{x:>2}".format(x=s) for s in orthcode])
+                    print '|'.join(["{x:02d}".format(x=d) for d in grapheme_ids])
+                    print "orthography_id: " + str(orthography_id)
+                row = zip([orthography_id]*n, grapheme_ids, range(n))
+                values.extend(row)
+        cur.executemany(cmd_insert, values)
+
+def grapheme_representation(conn, alphabet, phonmap, verbose=False):
+    """
+    Insert accent into database.
+
+    # Register a accent
+    >>> aae.sql.insert.corpus(conn, "standard")
+
+    # Register a accent with a description
+    >>> aae.sql.insert.corpus(conn, "mild", "Only vowels differ from standard.")
+    >>> aae.sql.insert.corpus(conn, "strong", "Both vowels and consonants differ from standard.")
+
+    """
+    cmd_insert = "INSERT INTO orthrep (alphabet_id,grapheme_id,unit,value) VALUES (?,?,?,?);"
+    cmd_select_alphabet_id = "SELECT id FROM alphabet WHERE label=:alphabet LIMIT 1;"
+    cmd_select_grapheme_id = "SELECT id FROM grapheme WHERE grapheme=:grapheme LIMIT 1;"
+    values = []
+    with conn:
+        cur = conn.cursor()
+        cur.execute(cmd_select_alphabet_id, {'alphabet': alphabet})
+        r = cur.fetchone()
+        alphabet_id = r['id']
+        for grapheme,representation in phonmap.items():
+            cur.execute(cmd_select_grapheme_id, {'grapheme': grapheme})
+            r = cur.fetchone()
+            if r is None:
+                if verbose:
+                    print "Adding grapheme `"+grapheme+"` to database."
+                graphemes(conn, grapheme)
+                cur.execute(cmd_select_grapheme_id, {'grapheme': grapheme})
+                r = cur.fetchone()
+
+            grapheme_id = r['id']
+            n = len(representation)
+            values.extend(zip([alphabet_id]*n, [grapheme_id]*n, range(n), representation))
+        cur.executemany(cmd_insert, values)
+
+def alphabet(conn, label, description='', orthmap={}):
+    """
+    Insert alphabet into database.
+
+    # Register an alphabet
+    >>> aae.sql.insert.alphabet(conn, "orthogonal", orthmap=ORTH_MAP)
+
+    # Register an alphabet with a description
+    >>> aae.sql.insert.alphabet(conn, "orthogonal", description="No inherent similarity among graphemes.", orthmap=ORTH_MAP)
+
+    """
+    cmd_insert = "INSERT INTO alphabet (label, description) VALUES (:label,:desc)"
+    with conn:
+        cur = conn.cursor()
+        cur.execute(cmd_insert, {'label': label, 'desc': description})
+
+    if orthmap:
+        grapheme_representation(conn, label, orthmap)
+
+def sample(conn, corpus, rootphon, altphon, n, ndiff, nhomo_root, list_id=[], list_stim=[]):
+    cmd_select_corpus_id = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1;"
+    cmd_select_dialect_id = "SELECT id FROM dialect WHERE label=:dialect LIMIT 1;"
+    cmd_select_word_id = "SELECT id FROM word WHERE word=:word AND corpus_id=:corpus_id LIMIT 1;"
+    cmd_select_word_by_phon = "SELECT word_id FROM word_has_phonology WHERE phonology_id=:phon;"
+    #cmd_select_homo_id = "SELECT word_id,homo_id FROM homophones WHERE corpus_id=:corpus;"
+    cmd_select_homophone = ("SELECT phonology_id "
+                            "FROM word_has_phonology "
+                            "WHERE dialect_id=:dialect "
+                            "GROUP BY phonology_id "
+                            "HAVING count(*)>1;")
+    cmd_select_same = ("SELECT word_id "
+                       "FROM word_has_phonology AS a"
+                       "JOIN word AS b ON a.word_id=b.id "
+                       "WHERE a.corpus_id=:corpus AND a.dialect_id=:root AND a.dialect_id=:alt "
+                       "GROUP BY word_id "
+                       "HAVING min(phonology_id)=max(phonology_id);")
+    cmd_select_diff = ("SELECT word_id "
+                       "FROM word_has_phonology AS a"
+                       "JOIN word AS b ON a.word_id=b.id "
+                       "WHERE a.corpus_id=:corpus AND a.dialect_id=:root AND a.dialect_id=:alt "
+                       "GROUP BY word_id "
+                       "HAVING min(phonology_id)!=max(phonology_id);")
+    cmd_insert_sample = "INSERT INTO sample (label,alt_id,root_id,n,n_root_homophones,n_diff,p_rule_applied) VALUES (?,?,?,?,?);"
+    cmd_insert_sample_has_word = "INSERT INTO sample_has_word (sample_id,word_id) VALUES (?,?);"
+
+    def generate(conn, corpus_id, root_id, alt_id, n, ndiff, nhomo_root):
+        with conn:
+            cur = conn.cursor()
+            cur.execute(cmd_select_same, {'corpus', corpus_id, 'root', root_id, 'alt', alt_id})
+            SAME = cur.fetchall()
+            cur.execute(cmd_select_diff, {'corpus', corpus_id, 'root', root_id, 'alt', alt_id})
+            DIFF = cur.fetchall()
+            cur.execute(cmd_select_homophone, {'dialect': root_id})
+            HOMO = cur.fetchall()
+
+        nsame = n - ndiff
+        random.shuffle(SAME)
+        random.shuffle(DIFF)
+        random.shuffle(HOMO)
+
+        samp = []
+        for h in HOMO[:nhomo_root]:
+            cur.execute(cmd_select_word_by_phon, {'phon',h['phonology_id']})
+            samp.extend([r['word_id'] for r in cur.fetchmany()])
+
+        samp_nsame = sum([1 for w in samp if w in SAME])
+        samp_ndiff = sum([1 for w in samp if w in DIFF])
+
+        while samp_nsame < nsame:
+            x = SAME.pop()
+            if x not in samp:
+                samp.append(x)
+                samp_nsame += 1
+
+        while samp_ndiff < ndiff:
+            x = diff.pop()
+            if x not in samp:
+                samp.append(x)
+                samp_ndiff += 1
+
+        return samp
+        # end generate
+
+    if list_id and list_stim:
+        error("list_id and list_stim cannot both be defined.");
+
+    with conn:
+        cur = conn.cursor()
+        cur.execute(cmd_select_dialect_id, {'dialect': rootphon})
+        r = cur.fetchone()
+        if r is None:
+            print "Error: {} is not a recognized dialect label (rootphon).".format(rootphon)
+        root_id = r['id']
+
+        cur.execute(cmd_select_dialect_id, {'dialect': altphon})
+        r = cur.fetchone()
+        if r is None:
+            print "Error: {} is not a recognized dialect label (altphon).".format(altphon)
+        alt_id = r['id']
+
+        cur.execute(cmd_select_corpus_id, {'corpus': corpus})
+        r = cur.fetchone()
+        if r is None:
+            print "Error: {} is not a recognized corpus label.".format(corpus)
+        corpus_id = r['id']
+
+    if not list_id and not list_stim:
+        list_id = generate(conn, corpus_id, root_id, alt_id, n, ndiff, nhomo_root)
+
+    if list_stim:
+        list_id = []
+        with conn:
+            cur = conn.cursor()
+            for w in list_stim:
+                cur.execute(cmd_select_word_id, {'word': w, 'corpus_id': corpus_id})
+                r = cur.fetchone()
+                list_id.append(r['id'])
+
+    with conn:
+        cur = conn.cursor()
+        cur.execute(cmd_insert_sample,(label,root_id,alt_id,n,n_root_homophones,n_diff,1.0))
+        cur.execute("SELECT id FROM sample WHERE rowid=:rowid;", rowid=cur.lastrowid)
+        sample_id = cur.fetchone()
+        values = zip([sample_id]*n, list_id)
+        cur.executemany(cmd_insert_sample_has_word, values)
+
+    return sample_id
+
+def childsample(conn, sample_id, p_rule_applied):
+    cmd_select_sample = "SELECT word_id,dialect_id,phoncode FROM sample_has_word JOIN word ON sample_has_word.word_id=word.id WHERE sample_id=:sample_id;"
+    cmd_select_dialectids = "SELECT root_id, alt_id FROM sample WHERE sample_id=:sample_id;"
+    with conn:
+        cur = conn.cursor()
+        cur.execute(cmd_select_dialectids, {"sample_id": sample_id})
+        r = cur.fetchone()
+        root_id = r['root_id']
+        alt_id = r['alt_id']
+        cur.execute(cmd_select_sample, {"sample_id": sample_id})
+        list_id = [r['word_id'] for r in cur.fetchall()]
+
+
+
+

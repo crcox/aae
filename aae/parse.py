@@ -1,4 +1,22 @@
 import re
+def stripdash(p_):
+    # Record dashes
+    pat = re.compile('_+')
+    dashes = pat.findall(p_)
+    if len(dashes) == 1:
+        if p_[0] == '_':
+            dashes = dashes + ['']
+        else:
+            dashes = [''] + dashes
+
+    # Strip dashes
+    p = p_.strip('_')
+    return tuple([p,dashes])
+
+def applydash(p,dashes):
+    p_ = ''.join([dashes[0],p,dashes[-1]])
+    return p_
+
 def corpus(corppath,semmap,phonmap,phonmap_label,phon_label):
     CORPUS = {}
     with open(corppath, 'r') as f:
@@ -54,20 +72,3 @@ def semantics(sempath):
             SEM_MAP.append([int(x) for x in tmp[1:]])
     return SEM_MAP
 
-def stripdash(p_):
-    # Record dashes
-    pat = re.compile('_+')
-    dashes = pat.findall(p_)
-    if len(dashes) == 1:
-        if p_[0] == '_':
-            dashes = dashes + ['']
-        else:
-            dashes = [''] + dashes
-
-    # Strip dashes
-    p = p_.strip('_')
-    return tuple([p,dashes])
-
-def applydash(p,dashes):
-    p_ = ''.join([dashes[0],p,dashes[-1]])
-    return p_

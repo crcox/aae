@@ -1,0 +1,16 @@
+README
+setup.py
+aae/__init__.py
+aae/corpus.py
+aae/corpus_3k.py
+aae/dialects.py
+aae/parse.py
+aae/phoncodes.py
+aae/phonmaps.py
+aae/rules.py
+aae/sample.py
+aae/semantics.py
+aae.egg-info/PKG-INFO
+aae.egg-info/SOURCES.txt
+aae.egg-info/dependency_links.txt
+aae.egg-info/top_level.txt

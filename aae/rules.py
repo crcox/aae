@@ -1,5 +1,6 @@
 import aae
 import re
+from aae.phoncodes import consonants, vowels
 
 # DEVOICING
 # Rule 1: Final phonemes /b/, /d/, /v/, or /z/ replaced with /p/, /t/,
@@ -14,44 +15,41 @@ def devoice(p):
         }
 
     plist = list(p)
-    b = False
     try:
-        if p[-2] in aae.phoncodes.vowels and p[-1] in devoicing_rules.keys():
+        if p[-2] in vowels and p[-1] in devoicing_rules.keys():
             plist[-1] = devoicing_rules[p[-1]]
             p = ''.join(plist)
-            b = True
+            return p
     except IndexError:
         pass
 
-    return (b,p)
+    return None
 
 def consonant_cluster_reduction(p):
     # Consonant Cluster Reduction
     # Rule 2: If a word ends with a consonant cluster, and the cluster ends
     # with /t/ /d/ /s/ or /z/, drop it.
     plist = list(p)
-    b = False
     try:
-        if p[-2] in aae.phoncodes.consonants and p[-1] in ['t','d','s','z']:
+        if p[-2] in consonants and p[-1] in ['t','d','s','z']:
             plist[-1] = '_'
             p = ''.join(plist)
-            b = True
+            return p
     except IndexError:
         pass
 
-    return (b,p)
+    return None
 
 def postvocalic_reduction(p):
     # Post-vocalic Reduction
     # Rule 3: If a word ends with a vowel followed by an /r/, drop the /r/.
     plist = list(p)
-    b = False
     try:
-        if p[-2] in aae.phoncodes.vowels and p[-1] == 'r':
+        if p[-2] in vowels and p[-1] == 'r':
             plist[-1] = '_'
             p = ''.join(plist)
-            b = True
+            return p
     except IndexError:
         pass
 
-    return (b,p)
+    return None

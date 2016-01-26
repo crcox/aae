@@ -2,14 +2,14 @@ import aae
 def addpronunciation(CORPUS, plabel, rulelist, PHON_MAP, rootphon='SAE'):
     changelog = {k:[] for k in rulelist}
     for word, d in CORPUS.items():
-        phon_code,dashes = stripdash(d['phon_code'][rootphon])
+        phon_code,dashes = aae.parse.stripdash(d['phon_code'][rootphon])
         for r in rulelist:
             rule = getattr(aae.rules, r)
             RuleApplied,phon_code = rule(phon_code)
             if RuleApplied:
                 changelog[r].append(word)
 
-        phon_code = applydash(phon_code,dashes)
+        phon_code = aae.parse.applydash(phon_code,dashes)
         phon = []
         for x in phon_code:
             phon.append(PHON_MAP[x])
