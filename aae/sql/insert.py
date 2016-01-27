@@ -529,12 +529,15 @@ def alphabet(conn, label, description='', orthmap={}):
     if orthmap:
         grapheme_representation(conn, label, orthmap)
 
-def sample(conn, corpus, rootphon, altphon, n, ndiff, nhomo_root, list_id=[], list_stim=[]):
+def sample(conn, corpus, label, rootphon, altphon, n=[], ndiff=[], nhomo_root=[], list_id=[], list_stim=[]):
     cmd_select_corpus_id = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1;"
     cmd_select_dialect_id = "SELECT id FROM dialect WHERE label=:dialect LIMIT 1;"
     cmd_select_word_id = "SELECT id FROM word WHERE word=:word AND corpus_id=:corpus_id LIMIT 1;"
     cmd_select_word_by_phon = "SELECT word_id FROM word_has_phonology WHERE phonology_id=:phon;"
     #cmd_select_homo_id = "SELECT word_id,homo_id FROM homophones WHERE corpus_id=:corpus;"
+    cmd_select_phonology= ("SELECT phonology_id "
+                            "FROM word_has_phonology "
+                            "WHERE dialect_id=:dialect AND word_id=:word;")
     cmd_select_homophone = ("SELECT phonology_id "
                             "FROM word_has_phonology "
                             "WHERE dialect_id=:dialect "
@@ -552,8 +555,8 @@ def sample(conn, corpus, rootphon, altphon, n, ndiff, nhomo_root, list_id=[], li
                        "WHERE a.corpus_id=:corpus AND a.dialect_id=:root AND a.dialect_id=:alt "
                        "GROUP BY word_id "
                        "HAVING min(phonology_id)!=max(phonology_id);")
-    cmd_insert_sample = "INSERT INTO sample (label,alt_id,root_id,n,n_root_homophones,n_diff,p_rule_applied) VALUES (?,?,?,?,?);"
-    cmd_insert_sample_has_word = "INSERT INTO sample_has_word (sample_id,word_id) VALUES (?,?);"
+    cmd_insert_sample = "INSERT INTO sample (label,alt_id,root_id,n,n_root_homophones,n_diff,p_rule_applied) VALUES (?,?,?,?,?,?,?);"
+    cmd_insert_sample_has_example= "INSERT INTO sample_has_word (sample_id,word_id) VALUES (?,?);"
 
     def generate(conn, corpus_id, root_id, alt_id, n, ndiff, nhomo_root):
         with conn:
@@ -626,15 +629,20 @@ def sample(conn, corpus, rootphon, altphon, n, ndiff, nhomo_root, list_id=[], li
             for w in list_stim:
                 cur.execute(cmd_select_word_id, {'word': w, 'corpus_id': corpus_id})
                 r = cur.fetchone()
+                word_id = r['id']
+                cur.execute(cmd_select_phonology, {'dialect': root_id, 'word': word_id})
+                phon_id_root = 
+                cur.execute(cmd_select_phonology, {'dialect': alt_id, 'word': word_id})
+                phon_id_root = 
                 list_id.append(r['id'])
 
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert_sample,(label,root_id,alt_id,n,n_root_homophones,n_diff,1.0))
+        cur.execute(cmd_insert_sample,(label,root_id,alt_id,n,nhomo_root,ndiff,1.0))
         cur.execute("SELECT id FROM sample WHERE rowid=:rowid;", rowid=cur.lastrowid)
         sample_id = cur.fetchone()
         values = zip([sample_id]*n, list_id)
-        cur.executemany(cmd_insert_sample_has_word, values)
+        cur.executemany(cmd_insert_sample_has_example, values)
 
     return sample_id
 
@@ -649,7 +657,3 @@ def childsample(conn, sample_id, p_rule_applied):
         alt_id = r['alt_id']
         cur.execute(cmd_select_sample, {"sample_id": sample_id})
         list_id = [r['word_id'] for r in cur.fetchall()]
-
-
-
-

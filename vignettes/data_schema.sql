@@ -257,8 +257,8 @@ CREATE TABLE "sample_has_example" (
   "phonology_id" INTEGER NOT NULL,
   "orthography_id" INTEGER,
   PRIMARY KEY ("sample_id", "word_id")
-  CONSTRAINT "fk_sample_has_word_sample1" FOREIGN KEY ("sample_id") REFERENCES "sample" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT "fk_sample_has_word_word1" FOREIGN KEY ("word_id") REFERENCES "word" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT "fk_sample_has_example_sample1" FOREIGN KEY ("sample_id") REFERENCES "sample" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT "fk_sample_has_example_word1" FOREIGN KEY ("word_id") REFERENCES "word" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 -- CREATE TABLE "homophones" (
 --   "corpus_id" INTEGER NOT NULL,
@@ -275,8 +275,8 @@ CREATE INDEX "job_fk_job_experiment1_idx" ON "job" ("experiment_id","experiment_
 CREATE INDEX "performance_fk_performance_epoch1_idx" ON "performance" ("epoch_id","epoch_job_id","epoch_job_experiment_id","epoch_job_experiment_project_id");
 CREATE INDEX "epoch_fk_epoch_job1_idx" ON "epoch" ("job_id","job_experiment_id","job_experiment_project_id");
 CREATE INDEX "weight_fk_weight_epoch1_idx" ON "weight" ("epoch_id","epoch_job_id","epoch_job_experiment_id","epoch_job_experiment_project_id");
-CREATE INDEX "sample_has_word_fk_sample_has_word_sample1_idx" ON "sample_has_word" ("sample_id");
-CREATE INDEX "sample_has_word_fk_sample_has_word_word1_idx" ON "sample_has_word" ("word_id");
+CREATE INDEX "sample_has_example_fk_sample_has_example_sample1_idx" ON "sample_has_example" ("sample_id");
+CREATE INDEX "sample_has_example_fk_sample_has_example_word1_idx" ON "sample_has_example" ("word_id");
 CREATE INDEX "experiment_fk_experiment_project1_idx" ON "experiment" ("project_id");
 CREATE INDEX "experiment_fk_experiment_trainscript1_idx" ON "experiment" ("trainscript_id");
 CREATE INDEX "experiment_fk_experiment_version1_idx" ON "experiment" ("version_id");
