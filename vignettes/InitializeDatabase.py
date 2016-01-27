@@ -56,6 +56,7 @@ aae.sql.insert.orthography_has_graphemes(conn, update=False)
 with open("original_stimlist_500_250.txt", "r") as f:
     stimlist=[x.strip() for x in f.readlines()]
 
+aae.sql.insert.sample(conn, "3k", "test", "SAE", "AAE", 500, 250, 20)
 aae.sql.insert.sample(conn, "3k", "original", "SAE", "AAE", 500, 250, 20, list_stim=stimlist)
 
 conn.close()

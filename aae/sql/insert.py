@@ -529,7 +529,7 @@ def alphabet(conn, label, description='', orthmap={}):
     if orthmap:
         grapheme_representation(conn, label, orthmap)
 
-def sample(conn, corpus, label, rootphon, altphon, n=[], ndiff=[], nhomo_root=[], list_id=[], list_stim=[]):
+def sample(conn, corpus, label, rootphon, altphon, n=[], ndiff=[], nhomosets_root=[], list_id=[], list_stim=[]):
     cmd_select_corpus_id = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1;"
     cmd_select_dialect_id = "SELECT id FROM dialect WHERE label=:dialect LIMIT 1;"
     cmd_select_word_id = "SELECT id FROM word WHERE word=:word AND corpus_id=:corpus_id LIMIT 1;"
@@ -538,35 +538,40 @@ def sample(conn, corpus, label, rootphon, altphon, n=[], ndiff=[], nhomo_root=[]
     cmd_select_phonology= ("SELECT phonology_id "
                             "FROM word_has_phonology "
                             "WHERE dialect_id=:dialect AND word_id=:word;")
+    cmd_select_orthography = ("SELECT id "
+                            "FROM orthography "
+                            "WHERE word_id=:word ;")
     cmd_select_homophone = ("SELECT phonology_id "
                             "FROM word_has_phonology "
                             "WHERE dialect_id=:dialect "
                             "GROUP BY phonology_id "
                             "HAVING count(*)>1;")
     cmd_select_same = ("SELECT word_id "
-                       "FROM word_has_phonology AS a"
+                       "FROM word_has_phonology AS a "
                        "JOIN word AS b ON a.word_id=b.id "
-                       "WHERE a.corpus_id=:corpus AND a.dialect_id=:root AND a.dialect_id=:alt "
+                       "WHERE a.dialect_id=:root AND a.dialect_id=:alt "
                        "GROUP BY word_id "
                        "HAVING min(phonology_id)=max(phonology_id);")
     cmd_select_diff = ("SELECT word_id "
-                       "FROM word_has_phonology AS a"
+                       "FROM word_has_phonology AS a "
                        "JOIN word AS b ON a.word_id=b.id "
-                       "WHERE a.corpus_id=:corpus AND a.dialect_id=:root AND a.dialect_id=:alt "
+                       "WHERE a.dialect_id=:root AND a.dialect_id=:alt "
                        "GROUP BY word_id "
                        "HAVING min(phonology_id)!=max(phonology_id);")
     cmd_insert_sample = "INSERT INTO sample (label,alt_id,root_id,n,n_root_homophones,n_diff,p_rule_applied) VALUES (?,?,?,?,?,?,?);"
     cmd_insert_sample_has_example= "INSERT INTO sample_has_word (sample_id,word_id) VALUES (?,?);"
 
-    def generate(conn, corpus_id, root_id, alt_id, n, ndiff, nhomo_root):
+    def generate(conn, corpus_id, root_id, alt_id, n, ndiff, nhomosets_root):
         with conn:
             cur = conn.cursor()
-            cur.execute(cmd_select_same, {'corpus', corpus_id, 'root', root_id, 'alt', alt_id})
+            cur.execute(cmd_select_same, {'root': root_id, 'alt': alt_id})
             SAME = cur.fetchall()
-            cur.execute(cmd_select_diff, {'corpus', corpus_id, 'root', root_id, 'alt', alt_id})
+            cur.execute(cmd_select_diff, {'root': root_id, 'alt': alt_id})
             DIFF = cur.fetchall()
             cur.execute(cmd_select_homophone, {'dialect': root_id})
             HOMO = cur.fetchall()
+
+        import pdb; pdb.set_trace()
 
         nsame = n - ndiff
         random.shuffle(SAME)
@@ -574,8 +579,8 @@ def sample(conn, corpus, label, rootphon, altphon, n=[], ndiff=[], nhomo_root=[]
         random.shuffle(HOMO)
 
         samp = []
-        for h in HOMO[:nhomo_root]:
-            cur.execute(cmd_select_word_by_phon, {'phon',h['phonology_id']})
+        for h in HOMO[:nhomosets_root]:
+            cur.execute(cmd_select_word_by_phon, {'phon': h['phonology_id']})
             samp.extend([r['word_id'] for r in cur.fetchmany()])
 
         samp_nsame = sum([1 for w in samp if w in SAME])
@@ -596,8 +601,21 @@ def sample(conn, corpus, label, rootphon, altphon, n=[], ndiff=[], nhomo_root=[]
         return samp
         # end generate
 
+    examples = []
+    values = []
+
     if list_id and list_stim:
         error("list_id and list_stim cannot both be defined.");
+    else:
+        if list_id:
+            GIVEN_SAMPLE = list_id
+            GIVEN_AS_ID = True
+        elif list_stim:
+            GIVEN_SAMPLE = list_stim
+            GIVEN_AS_ID = False
+        else:
+            GIVEN_SAMPLE = []
+            GIVEN_AS_ID = False
 
     with conn:
         cur = conn.cursor()
@@ -619,11 +637,10 @@ def sample(conn, corpus, label, rootphon, altphon, n=[], ndiff=[], nhomo_root=[]
             print "Error: {} is not a recognized corpus label.".format(corpus)
         corpus_id = r['id']
 
-    if not list_id and not list_stim:
-        list_id = generate(conn, corpus_id, root_id, alt_id, n, ndiff, nhomo_root)
+    if not GIVEN_SAMPLE:
+        examples = generate(conn, corpus_id, root_id, alt_id, n, ndiff, nhomosets_root)
 
-    if list_stim:
-        list_id = []
+    else:
         with conn:
             cur = conn.cursor()
             for w in list_stim:
@@ -631,17 +648,23 @@ def sample(conn, corpus, label, rootphon, altphon, n=[], ndiff=[], nhomo_root=[]
                 r = cur.fetchone()
                 word_id = r['id']
                 cur.execute(cmd_select_phonology, {'dialect': root_id, 'word': word_id})
-                phon_id_root = 
+                r = cur.fetchone()
+                phon_id_root = r['phonology_id']
                 cur.execute(cmd_select_phonology, {'dialect': alt_id, 'word': word_id})
-                phon_id_root = 
-                list_id.append(r['id'])
+                r = cur.fetchone()
+                phon_id_alt = r['phonology_id']
+                cur.execute(cmd_select_orthography, {'word': word_id})
+                r = cur.fetchone()
+                orth_id = r['id']
+                examples.append((word_id,phon_id_root,orth_id))
+                examples.append((word_id,phon_id_alt,orth_id))
 
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert_sample,(label,root_id,alt_id,n,nhomo_root,ndiff,1.0))
+        cur.execute(cmd_insert_sample,(label,root_id,alt_id,n,nhomosets_root,ndiff,1.0))
         cur.execute("SELECT id FROM sample WHERE rowid=:rowid;", rowid=cur.lastrowid)
         sample_id = cur.fetchone()
-        values = zip([sample_id]*n, list_id)
+        values = zip([sample_id]*len(examples), examples)
         cur.executemany(cmd_insert_sample_has_example, values)
 
     return sample_id
