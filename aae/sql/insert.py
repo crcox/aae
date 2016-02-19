@@ -724,21 +724,69 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, n=[], ndiff=[], nhom
         cur = conn.cursor()
         cur.execute(cmd_insert_sample, (dialect_root_id,dialect_alt_id,accent_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff,1.0))
         cur.execute("SELECT id FROM sample WHERE rowid=:rowid;", {'rowid': cur.lastrowid})
-        sample_id = cur.fetchone()
-        values = [(sample_id[0],x[0],x[1],x[2],x[3]) for x in examples]
-        print values
+        r = cur.fetchone()
+        sample_id = r['id']
+        values = [(sample_id,x[0],x[1],x[2],x[3]) for x in examples]
         cur.executemany(cmd_insert_sample_has_example, values)
 
     return sample_id
 
-def childsample(conn, sample_id, p_rule_applied):
-    cmd_select_sample = "SELECT word_id,dialect_id,phoncode FROM sample_has_word JOIN word ON sample_has_word.word_id=word.id WHERE sample_id=:sample_id;"
-    cmd_select_dialectids = "SELECT root_id, alt_id FROM sample WHERE sample_id=:sample_id;"
+def childsample(conn, parent_sample_id, p_rule_applied):
+    cmd_select_sample = "SELECT dialect_root_id,dialect_alt_id,accent_id,n,n_root_homophones,n_root_homophonic_words,n_diff_root_alt FROM sample WHERE id=:sample_id;"
+    cmd_select_examples = "SELECT dialect_id,word_id,phonology_id,orthography_id FROM sample_has_example WHERE sample_id=:sample_id;"
+    cmd_select_phonology= ("SELECT phonology_id "
+                            "FROM word_has_phonology "
+                            "WHERE dialect_id=:dialect AND word_id=:word;")
+    cmd_insert_sample = "INSERT INTO sample (dialect_root_id,dialect_alt_id,accent_id,n,n_root_homophones,n_root_homophonic_words,n_alt_homophones,n_alt_homophonic_words,n_diff_root_alt,p_rule_applied,child_of) VALUES (?,?,?,?,?,?,?,?,?,?,?);"
+    cmd_insert_sample_has_example= "INSERT INTO sample_has_example (sample_id,word_id,phonology_id,orthography_id,dialect_id) VALUES (?,?,?,?,?);"
+
+    # alias
+    child_of = parent_sample_id
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_select_dialectids, {"sample_id": sample_id})
+        cur.execute(cmd_select_sample, {"sample_id": parent_sample_id})
         r = cur.fetchone()
-        root_id = r['root_id']
-        alt_id = r['alt_id']
-        cur.execute(cmd_select_sample, {"sample_id": sample_id})
-        list_id = [r['word_id'] for r in cur.fetchall()]
+        dialect_root_id = r['dialect_root_id']
+        dialect_alt_id = r['dialect_alt_id']
+        accent_id = r['accent_id']
+        n = r['n']
+        nhomo_root_samp = r['n_root_homophones']
+        nhomowords_root_samp = r['n_root_homophonic_words']
+        n_diff_parent = r['n_diff_root_alt']
+        ndiff = int(n_diff_parent * p_rule_applied) # this truncates any decimal information and returns an integer
+        n_to_change = n_diff_parent-ndiff
+
+        cur.execute(cmd_select_examples, {"sample_id": parent_sample_id})
+        examples = []
+        n_made_same = 0
+        for r in cur.fetchall():
+            dialect_id = r['dialect_id']
+            word_id = r['word_id']
+            phonology_id = r['phonology_id']
+            orthography_id = r['orthography_id']
+            # If the dialect is the "changed" alternate form, and we haven't
+            # already undone the number of changes we planned to, then pull the
+            # root phonology and overwrite the variable.
+            if dialect_id == dialect_alt_id and n_made_same < n_to_change:
+                cur.execute(cmd_select_phonology,{"dialect": dialect_root_id, "word": word_id})
+                p = cur.fetchone()
+                phonology_id = p['phonology_id']
+                n_made_same += 1
+
+            examples.append( (word_id,phonology_id,orthography_id,dialect_id) )
+
+    phon_id_alt = [x[1] for i,x in enumerate(examples) if x[3]==dialect_alt_id]
+    counts = [phon_id_alt.count(x) for x in set(phon_id_alt) if phon_id_alt.count(x) > 1]
+    nhomo_alt_samp = len(counts)
+    nhomowords_alt_samp = sum(counts)
+
+    with conn:
+        cur = conn.cursor()
+        cur.execute(cmd_insert_sample, (dialect_root_id,dialect_alt_id,accent_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff,p_rule_applied,child_of))
+        cur.execute("SELECT id FROM sample WHERE rowid=:rowid;", {'rowid': cur.lastrowid})
+        r = cur.fetchone()
+        sample_id = r['id']
+        values = [(sample_id,x[0],x[1],x[2],x[3]) for x in examples]
+        cur.executemany(cmd_insert_sample_has_example, values)
+
+    return sample_id

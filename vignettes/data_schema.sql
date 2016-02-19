@@ -222,6 +222,7 @@ CREATE TABLE "sample" (
   "n_alt_homophonic_words" INTEGER NOT NULL,
   "n_diff_root_alt" INTEGER NOT NULL,
   "p_rule_applied" double DEFAULT NULL,
+  "child_of" INTEGER DEFAULT NULL,
   PRIMARY KEY ("id")
   CONSTRAINT "fk_sample_dialect1" FOREIGN KEY ("dialect_root_id", "dialect_alt_id") REFERENCES "dialect" ("id", "id") ON DELETE NO ACTION ON UPDATE NO ACTION
   CONSTRAINT "fk_sample_accent1" FOREIGN KEY ("accent_id") REFERENCES "accent" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION

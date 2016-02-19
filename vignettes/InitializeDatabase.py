@@ -57,6 +57,7 @@ with open("original_stimlist_500_250.txt", "r") as f:
     stimlist=[x.strip() for x in f.readlines()]
 
 aae.sql.insert.sample(conn, "3k", "SAE", "AAE", "standard", 500, 250, 20)
-aae.sql.insert.sample(conn, "3k", "SAE", "AAE", "standard", 500, 250, 20, list_stim=stimlist)
+sample_id = aae.sql.insert.sample(conn, "3k", "SAE", "AAE", "standard", 500, 250, 20, list_stim=stimlist)
+aae.sql.insert.childsample(conn, sample_id, 0.75)
 
 conn.close()
