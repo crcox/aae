@@ -212,14 +212,19 @@ CREATE TABLE "rule" (
 );
 CREATE TABLE "sample" (
   "id" INTEGER,
-  "root_id" INTEGER NOT NULL,
-  "alt_id" INTEGER NOT NULL,
+  "dialect_root_id" INTEGER NOT NULL,
+  "dialect_alt_id" INTEGER NOT NULL,
+  "accent_id" INTEGER NOT NULL,
   "n" INTEGER NOT NULL,
   "n_root_homophones" INTEGER NOT NULL,
-  "n_diff_aae_sae" INTEGER NOT NULL,
+  "n_root_homophonic_words" INTEGER NOT NULL,
+  "n_alt_homophones" INTEGER NOT NULL,
+  "n_alt_homophonic_words" INTEGER NOT NULL,
+  "n_diff_root_alt" INTEGER NOT NULL,
   "p_rule_applied" double DEFAULT NULL,
   PRIMARY KEY ("id")
-  CONSTRAINT "fk_sample_dialect1" FOREIGN KEY ("root_id", "alt_id") REFERENCES "dialect" ("id", "id") ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT "fk_sample_dialect1" FOREIGN KEY ("dialect_root_id", "dialect_alt_id") REFERENCES "dialect" ("id", "id") ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT "fk_sample_accent1" FOREIGN KEY ("accent_id") REFERENCES "accent" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 CREATE TABLE "semrep" (
   "corpus_id" INTEGER NOT NULL,
@@ -255,20 +260,15 @@ CREATE TABLE "sample_has_example" (
   "sample_id" INTEGER NOT NULL,
   "word_id" INTEGER NOT NULL,
   "phonology_id" INTEGER NOT NULL,
-  "orthography_id" INTEGER,
-  PRIMARY KEY ("sample_id", "word_id")
+  "orthography_id" INTEGER NOT NULL,
+  "dialect_id" INTEGER NOT NULL,
+  PRIMARY KEY ("sample_id", "word_id", "dialect_id")
   CONSTRAINT "fk_sample_has_example_sample1" FOREIGN KEY ("sample_id") REFERENCES "sample" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT "fk_sample_has_example_word1" FOREIGN KEY ("word_id") REFERENCES "word" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT "fk_sample_has_example_phonology1" FOREIGN KEY ("phonology_id") REFERENCES "phonology" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT "fk_sample_has_example_orthography1" FOREIGN KEY ("orthography_id") REFERENCES "orthography" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT "fk_sample_has_example_dialect1" FOREIGN KEY ("dialect_id") REFERENCES "dialect" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
 );
--- CREATE TABLE "homophones" (
---   "corpus_id" INTEGER NOT NULL,
---   "word_id" INTEGER NOT NULL,
---   "homo_id" INTEGER NOT NULL,
---   PRIMARY KEY ("corpus_id","word_id","homo_id"),
---   CONSTRAINT "fk_homophones_corpus1" FOREIGN KEY ("corpus_id") REFERENCES "word" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION,
---   CONSTRAINT "fk_homophones_word1" FOREIGN KEY ("word_id") REFERENCES "word" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION,
---   CONSTRAINT "fk_homophones_homo1" FOREIGN KEY ("homo_id") REFERENCES "word" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
--- );
 CREATE INDEX "phonrep_fk_phonrep_phoneme1_idx" ON "phonrep" ("phoneme_id");
 CREATE INDEX "phonrep_fk_phonrep_accent1_idx" ON "phonrep" ("accent_id");
 CREATE INDEX "job_fk_job_experiment1_idx" ON "job" ("experiment_id","experiment_project_id");

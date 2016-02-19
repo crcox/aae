@@ -9,7 +9,7 @@ from aae.semantics import standard_3k as SEM_MAP
 
 db_name = "./aae_base.db"
 db_schema = "./data_schema.sql"
-stim_master = "/home/chris/Projects/AAE/raw/3kdict"
+stim_master = "../raw/3kdict"
 
 # Load the corpus
 CORPUS = aae.parse.corpus(stim_master, SEM_MAP, PHON_MAP, "standard", 'SAE')
@@ -56,7 +56,7 @@ aae.sql.insert.orthography_has_graphemes(conn, update=False)
 with open("original_stimlist_500_250.txt", "r") as f:
     stimlist=[x.strip() for x in f.readlines()]
 
-aae.sql.insert.sample(conn, "3k", "test", "SAE", "AAE", 500, 250, 20)
-aae.sql.insert.sample(conn, "3k", "original", "SAE", "AAE", 500, 250, 20, list_stim=stimlist)
+aae.sql.insert.sample(conn, "3k", "SAE", "AAE", "standard", 500, 250, 20)
+aae.sql.insert.sample(conn, "3k", "SAE", "AAE", "standard", 500, 250, 20, list_stim=stimlist)
 
 conn.close()

@@ -1,9 +1,9 @@
 README
 setup.py
 aae/__init__.py
+aae/accents.py
 aae/corpus.py
 aae/corpus_3k.py
-aae/dialects.py
 aae/parse.py
 aae/phoncodes.py
 aae/phonmaps.py
