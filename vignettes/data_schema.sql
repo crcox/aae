@@ -135,7 +135,7 @@ CREATE TABLE "phonology_has_phoneme" (
   "unit" INTEGER NOT NULL,
   PRIMARY KEY ("phonology_id","phoneme_id","unit")
   CONSTRAINT "fk_phonology_has_phoneme_phonology1" FOREIGN KEY ("phonology_id") REFERENCES "phonology" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION,
-  CONSTRAINT "fk_phonology_has_phoneme_phoneme1" FOREIGN KEY ("phoneme_id") REFERENCES "grapheme" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT "fk_phonology_has_phoneme_phoneme1" FOREIGN KEY ("phoneme_id") REFERENCES "phoneme" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 CREATE TABLE "phonology_has_rule" (
   "dialect_id" INTEGER NOT NULL,
@@ -212,9 +212,11 @@ CREATE TABLE "rule" (
 );
 CREATE TABLE "sample" (
   "id" INTEGER,
+  "accent_id" INTEGER NOT NULL,
+  "alphabet_id" INTEGER NOT NULL,
+  "corpus_id" INTEGER NOT NULL,
   "dialect_root_id" INTEGER NOT NULL,
   "dialect_alt_id" INTEGER NOT NULL,
-  "accent_id" INTEGER NOT NULL,
   "n" INTEGER NOT NULL,
   "n_root_homophones" INTEGER NOT NULL,
   "n_root_homophonic_words" INTEGER NOT NULL,
@@ -222,6 +224,7 @@ CREATE TABLE "sample" (
   "n_alt_homophonic_words" INTEGER NOT NULL,
   "n_diff_root_alt" INTEGER NOT NULL,
   "p_rule_applied" double DEFAULT NULL,
+  "use_frequency" INTEGER NOT NULL,
   "child_of" INTEGER DEFAULT NULL,
   PRIMARY KEY ("id")
   CONSTRAINT "fk_sample_dialect1" FOREIGN KEY ("dialect_root_id", "dialect_alt_id") REFERENCES "dialect" ("id", "id") ON DELETE NO ACTION ON UPDATE NO ACTION
@@ -253,6 +256,7 @@ CREATE TABLE "weight" (
 CREATE TABLE "word" (
   "id" INTEGER,
   "word" TEXT NOT NULL,
+  "frequency" INTEGER DEFAULT 1,
   "corpus_id" INTEGER NOT NULL,
   CONSTRAINT "pk_word" PRIMARY KEY ("id"),
   CONSTRAINT "fk_word_corpus1" FOREIGN KEY ("corpus_id") REFERENCES "corpus" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION

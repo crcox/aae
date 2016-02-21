@@ -9,7 +9,7 @@ import aae
 # anticipated use cases, this is fine, but may be an issue if the amount of
 # data to be inserted becomes "too large".
 
-def words(conn, corpus, word_labels):
+def words(conn, corpus, word_labels, word_frequency=[]):
     """
     Insert word into database and associate with a corpus.
 
@@ -21,7 +21,11 @@ def words(conn, corpus, word_labels):
 
     """
     cmd_select = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1"
-    cmd_insert = "INSERT INTO word (corpus_id, word) VALUES (?, ?)"
+    if word_frequency:
+        cmd_insert = "INSERT INTO word (corpus_id, word, frequency) VALUES (?, ?, ?)"
+    else:
+        cmd_insert = "INSERT INTO word (corpus_id, word) VALUES (?, ?)"
+
     values = []
     # In the event of an exception, the transaction is rolled back; otherwise,
     # the transaction is committed.
@@ -39,7 +43,12 @@ def words(conn, corpus, word_labels):
 #        # Append insert values to the rest of the insert command
 #        cmd_insert += values
 
-        values = zip([corpus_id]*len(word_labels), word_labels)
+        if word_frequency:
+            if len(word_labels) != len(word_frequency):
+                raise RuntimeError('Word and frequency lists are of different lengths.')
+            values = zip([corpus_id]*len(word_labels), word_labels, word_frequency)
+        else:
+            values = zip([corpus_id]*len(word_labels), word_labels)
 
         # Execute insert command
         cur.executemany(cmd_insert, values)
@@ -530,10 +539,11 @@ def alphabet(conn, label, description='', orthmap={}):
     if orthmap:
         grapheme_representation(conn, label, orthmap)
 
-def sample(conn, corpus, dialect_root, dialect_alt, accent, n=[], ndiff=[], nhomo_root=[], list_id=[], list_stim=[]):
+def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[], ndiff=[], nhomo_root=[], fequency=False, list_id=[], list_stim=[]):
     cmd_select_corpus_id = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1;"
     cmd_select_dialect_id = "SELECT id FROM dialect WHERE label=:dialect LIMIT 1;"
     cmd_select_accent_id = "SELECT id FROM accent WHERE label=:accent LIMIT 1;"
+    cmd_select_alphabet_id = "SELECT id FROM alphabet WHERE label=:alphabet LIMIT 1;"
     cmd_select_word_id = "SELECT id FROM word WHERE word=:word AND corpus_id=:corpus_id LIMIT 1;"
     cmd_select_word_by_phon = "SELECT word_id FROM word_has_phonology WHERE phonology_id=:phon AND dialect_id=:dialect;"
     #cmd_select_homo_id = "SELECT word_id,homo_id FROM homophones WHERE corpus_id=:corpus;"
@@ -556,7 +566,7 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, n=[], ndiff=[], nhom
                        "FROM word_has_phonology "
                        "GROUP BY word_id "
                        "HAVING min(phonology_id)!=max(phonology_id);")
-    cmd_insert_sample = "INSERT INTO sample (dialect_root_id,dialect_alt_id,accent_id,n,n_root_homophones,n_root_homophonic_words,n_alt_homophones,n_alt_homophonic_words,n_diff_root_alt,p_rule_applied) VALUES (?,?,?,?,?,?,?,?,?,?);"
+    cmd_insert_sample = "INSERT INTO sample (dialect_root_id,dialect_alt_id,accent_id,n,n_root_homophones,n_root_homophonic_words,n_alt_homophones,n_alt_homophonic_words,n_diff_root_alt,p_rule_applied,use_frequency) VALUES (?,?,?,?,?,?,?,?,?,?,?);"
     cmd_insert_sample_has_example= "INSERT INTO sample_has_example (sample_id,word_id,phonology_id,orthography_id,dialect_id) VALUES (?,?,?,?,?);"
 
     def generate(conn, corpus_id, root_id, alt_id, n, ndiff, nhomo_root):
@@ -584,8 +594,8 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, n=[], ndiff=[], nhom
             phon_id_root = h['phonology_id']
             word_count = h['word_count']
             cur.execute(cmd_select_word_by_phon, {'phon': phon_id_root, 'dialect': root_id})
-            for r in cur.fetchall():
-                word_id = r['word_id']
+            for R in cur.fetchall():
+                word_id = R['word_id']
                 if word_id not in examples:
                     word_id_set.append(word_id)
                     cur.execute(cmd_select_orthography, {'word': word_id})
@@ -687,6 +697,12 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, n=[], ndiff=[], nhom
             print "Error: {} is not a recognized accent label.".format(corpus)
         accent_id = r['id']
 
+        cur.execute(cmd_select_alphabet_id, {'alphabet': alphabet})
+        r = cur.fetchone()
+        if r is None:
+            print "Error: {} is not a recognized alphabet label.".format(corpus)
+        alphabet_id = r['id']
+
     if not GIVEN_SAMPLE:
         examples = generate(conn, corpus_id, dialect_root_id, dialect_alt_id, n, ndiff, nhomo_root)
 
@@ -709,6 +725,11 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, n=[], ndiff=[], nhom
                 examples.append((word_id,phon_id_root,orth_id,dialect_root_id))
                 examples.append((word_id,phon_id_alt,orth_id,dialect_alt_id))
 
+    ndiff_samp = 0
+    for i,j in zip(range(0,len(examples),2),range(0,len(examples),2)):
+        if examples[i][1] != examples[j][1]:
+            ndiff_samp += 1
+
     phon_id_root = [x[1] for i,x in enumerate(examples) if x[3]==dialect_root_id]
     phon_id_alt = [x[1] for i,x in enumerate(examples) if x[3]==dialect_alt_id]
 
@@ -722,11 +743,11 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, n=[], ndiff=[], nhom
 
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert_sample, (dialect_root_id,dialect_alt_id,accent_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff,1.0))
+        cur.execute(cmd_insert_sample, (dialect_root_id,dialect_alt_id,accent_id,alphabet_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff_samp,1.0,int(frequency)))
         cur.execute("SELECT id FROM sample WHERE rowid=:rowid;", {'rowid': cur.lastrowid})
         r = cur.fetchone()
         sample_id = r['id']
-        values = [(sample_id,x[0],x[1],x[2],x[3]) for x in examples]
+        values = [(sample_id,x[0],x[1],x[2],x[3],x[4]) for x in examples]
         cur.executemany(cmd_insert_sample_has_example, values)
 
     return sample_id

@@ -12,9 +12,12 @@ db_schema = "./data_schema.sql"
 stim_master = "../raw/3kdict"
 
 # Load the corpus
+# See the referenced files for examples of how to specify the different parts
+# of the corpus. If your data are structured differently, either change your
+# data or write your own parse function.
 CORPUS = aae.parse.corpus(stim_master, SEM_MAP, PHON_MAP, "standard", 'SAE')
 
-# Create AAE
+# In fact, all of the below refer to these basic components of the corpus.
 words = [w for w in CORPUS.keys()]
 orthcodemap = dict([(w,CORPUS[w]['orth_code']) for w in CORPUS.keys()])
 phoncodemap = dict([(w,CORPUS[w]['phon_code']['SAE']) for w in CORPUS.keys()])
@@ -51,13 +54,48 @@ aae.sql.insert.phonology_has_phonemes(conn, update=False)
 aae.sql.insert.alphabet(conn, "orthogonal", description="No inherent similarity among graphemes.", orthmap=ORTH_MAP)
 aae.sql.insert.orthography(conn, "3k", orthcodemap=orthcodemap)
 aae.sql.insert.orthography_has_graphemes(conn, update=False)
+
+#### This completes the basic setup of the database. Next, we need to generate
+#### and add samples to the database. A sample refers to a collection of
+#### examples, and an example is defined by orth, sem, and phon representations
+#### associated with a particular word, given a particular corpus, alphabet, and
+#### dialect.
+
 # Sample
+# A sample can be generated according to the following guidelines. The sample
+# will be inserted directly into the database. The return value of the function
+# is the sample id, and all examples contained in the sample will be associated
+# with this id.
+aae.sql.insert.sample(conn,
+    corpus="3k",
+    dialect_root="SAE",
+    dialect_alt="AAE",
+    accent="standard",
+    alphabet="orthogonal",
+    n=500,
+    ndiff=250,
+    nhomo_root=20)
+
 ## A sample can be explicitly defined.
 with open("original_stimlist_500_250.txt", "r") as f:
     stimlist=[x.strip() for x in f.readlines()]
 
-aae.sql.insert.sample(conn, "3k", "SAE", "AAE", "standard", 500, 250, 20)
-sample_id = aae.sql.insert.sample(conn, "3k", "SAE", "AAE", "standard", 500, 250, 20, list_stim=stimlist)
+# If building from a pre-defined list of words, counts will be derived and so
+# you do not have to specify them. Also, note that the return value for the
+# function is the sample id of the newly-added sample. This can be used to
+# facilitate generating child samples.
+sample_id = aae.sql.insert.sample(conn,
+    corpus="3k",
+    dialect_root="SAE",
+    dialect_alt="AAE",
+    accent="standard",
+    alphabet="orthogonal",
+    list_stim=stimlist)
+
+# A child sample inherits everything from the parent, but with rules for
+# obtaining alternate pronunciations applied only a specified proportion of the
+# time. Allows for the number of differences between dialects in the sample to
+# be manipulated holding everything else constant.
 aae.sql.insert.childsample(conn, sample_id, 0.75)
 
 conn.close()
