@@ -88,7 +88,7 @@ def phoneme_representations(conn, accent, phonmap, verbose=False):
     >>> aae.sql.insert.corpus(conn, "strong", "Both vowels and consonants differ from standard.")
 
     """
-    cmd_insert = "INSERT INTO phonrep (phoneme_id,accent_id,unit,value) VALUES (?,?,?,?);"
+    cmd_insert = "INSERT INTO phonrep (accent_id,phoneme_id,unit,value) VALUES (?,?,?,?);"
     cmd_select_accent_id = "SELECT id FROM accent WHERE label=:accent LIMIT 1;"
     cmd_select_phoneme_id = "SELECT id FROM phoneme WHERE phoneme=:phoneme LIMIT 1;"
     values = []
@@ -539,7 +539,7 @@ def alphabet(conn, label, description='', orthmap={}):
     if orthmap:
         grapheme_representation(conn, label, orthmap)
 
-def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[], ndiff=[], nhomo_root=[], fequency=False, list_id=[], list_stim=[]):
+def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[], ndiff=[], nhomo_root=[], use_frequency=False, list_id=[], list_stim=[]):
     cmd_select_corpus_id = "SELECT id FROM corpus WHERE label=:corpus LIMIT 1;"
     cmd_select_dialect_id = "SELECT id FROM dialect WHERE label=:dialect LIMIT 1;"
     cmd_select_accent_id = "SELECT id FROM accent WHERE label=:accent LIMIT 1;"
@@ -566,7 +566,7 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[], ndif
                        "FROM word_has_phonology "
                        "GROUP BY word_id "
                        "HAVING min(phonology_id)!=max(phonology_id);")
-    cmd_insert_sample = "INSERT INTO sample (dialect_root_id,dialect_alt_id,accent_id,n,n_root_homophones,n_root_homophonic_words,n_alt_homophones,n_alt_homophonic_words,n_diff_root_alt,p_rule_applied,use_frequency) VALUES (?,?,?,?,?,?,?,?,?,?,?);"
+    cmd_insert_sample = "INSERT INTO sample (dialect_root_id,dialect_alt_id,accent_id,alphabet_id,corpus_id,n,n_root_homophones,n_root_homophonic_words,n_alt_homophones,n_alt_homophonic_words,n_diff_root_alt,p_rule_applied,use_frequency) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);"
     cmd_insert_sample_has_example= "INSERT INTO sample_has_example (sample_id,word_id,phonology_id,orthography_id,dialect_id) VALUES (?,?,?,?,?);"
 
     def generate(conn, corpus_id, root_id, alt_id, n, ndiff, nhomo_root):
@@ -664,9 +664,11 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[], ndif
         if list_id:
             GIVEN_SAMPLE = list_id
             GIVEN_AS_ID = True
+            n = len(GIVEN_SAMPLE)
         elif list_stim:
             GIVEN_SAMPLE = list_stim
             GIVEN_AS_ID = False
+            n = len(GIVEN_SAMPLE)
         else:
             GIVEN_SAMPLE = []
             GIVEN_AS_ID = False
@@ -743,22 +745,23 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[], ndif
 
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert_sample, (dialect_root_id,dialect_alt_id,accent_id,alphabet_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff_samp,1.0,int(frequency)))
+        print dialect_root_id,dialect_alt_id,accent_id,alphabet_id,corpus_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff_samp,1.0,int(use_frequency)
+        cur.execute(cmd_insert_sample, (dialect_root_id,dialect_alt_id,accent_id,alphabet_id,corpus_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff_samp,1.0,int(use_frequency)))
         cur.execute("SELECT id FROM sample WHERE rowid=:rowid;", {'rowid': cur.lastrowid})
         r = cur.fetchone()
         sample_id = r['id']
-        values = [(sample_id,x[0],x[1],x[2],x[3],x[4]) for x in examples]
+        values = [(sample_id,x[0],x[1],x[2],x[3]) for x in examples]
         cur.executemany(cmd_insert_sample_has_example, values)
 
     return sample_id
 
 def childsample(conn, parent_sample_id, p_rule_applied):
-    cmd_select_sample = "SELECT dialect_root_id,dialect_alt_id,accent_id,n,n_root_homophones,n_root_homophonic_words,n_diff_root_alt FROM sample WHERE id=:sample_id;"
+    cmd_select_sample = "SELECT dialect_root_id,dialect_alt_id,accent_id,alphabet_id,corpus_id,n,n_root_homophones,n_root_homophonic_words,n_diff_root_alt,use_frequency FROM sample WHERE id=:sample_id;"
     cmd_select_examples = "SELECT dialect_id,word_id,phonology_id,orthography_id FROM sample_has_example WHERE sample_id=:sample_id;"
     cmd_select_phonology= ("SELECT phonology_id "
                             "FROM word_has_phonology "
                             "WHERE dialect_id=:dialect AND word_id=:word;")
-    cmd_insert_sample = "INSERT INTO sample (dialect_root_id,dialect_alt_id,accent_id,n,n_root_homophones,n_root_homophonic_words,n_alt_homophones,n_alt_homophonic_words,n_diff_root_alt,p_rule_applied,child_of) VALUES (?,?,?,?,?,?,?,?,?,?,?);"
+    cmd_insert_sample = "INSERT INTO sample (dialect_root_id,dialect_alt_id,accent_id,alphabet_id,corpus_id,n,n_root_homophones,n_root_homophonic_words,n_alt_homophones,n_alt_homophonic_words,n_diff_root_alt,p_rule_applied,use_frequency,child_of) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
     cmd_insert_sample_has_example= "INSERT INTO sample_has_example (sample_id,word_id,phonology_id,orthography_id,dialect_id) VALUES (?,?,?,?,?);"
 
     # alias
@@ -770,10 +773,13 @@ def childsample(conn, parent_sample_id, p_rule_applied):
         dialect_root_id = r['dialect_root_id']
         dialect_alt_id = r['dialect_alt_id']
         accent_id = r['accent_id']
+        alphabet_id = r['alphabet_id']
+        corpus_id = r['corpus_id']
         n = r['n']
         nhomo_root_samp = r['n_root_homophones']
         nhomowords_root_samp = r['n_root_homophonic_words']
         n_diff_parent = r['n_diff_root_alt']
+        use_frequency = r['use_frequency']
         ndiff = int(n_diff_parent * p_rule_applied) # this truncates any decimal information and returns an integer
         n_to_change = n_diff_parent-ndiff
 
@@ -803,7 +809,7 @@ def childsample(conn, parent_sample_id, p_rule_applied):
 
     with conn:
         cur = conn.cursor()
-        cur.execute(cmd_insert_sample, (dialect_root_id,dialect_alt_id,accent_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff,p_rule_applied,child_of))
+        cur.execute(cmd_insert_sample, (dialect_root_id,dialect_alt_id,accent_id,alphabet_id,corpus_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff,p_rule_applied,use_frequency,child_of))
         cur.execute("SELECT id FROM sample WHERE rowid=:rowid;", {'rowid': cur.lastrowid})
         r = cur.fetchone()
         sample_id = r['id']
