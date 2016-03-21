@@ -56,12 +56,6 @@ for k,path in set([s for cfg in phases for s in cfg['stimuli'].items()]):
             words.append(w)
 words.sort()
 
-HOMO = {}
-# Stimuli need to be keyed with the name of the dataset
-for k,path in set([s for cfg in phases for s in cfg['homophones'].items()]):
-    with open(path,'rb') as f:
-        HOMO[k] = pickle.load(f)
-
 # Add "warmstart" data into the STIM structures.
 WarmCfg_prev = {}
 for cfg in phases:
