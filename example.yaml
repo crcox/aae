@@ -1,0 +1,22 @@
+context: true
+disambiguateHomophones: false
+events:
+  phonWS_semphon:
+  - {ip: 1, tp: 1, ts: 1, w: 1}
+  - {ip: 0, tp: 1, ts: 1, w: 0}
+  - {ip: 0, tp: 1, ts: 1, w: 0}
+  sem_phon:
+  - {is: 1, tp: 1, ts: 1}
+  - {is: 0, tp: 1, ts: 1}
+  - {is: 0, tp: 1, ts: 1}
+frequency: false
+header: {actI: 1, actT: 1, defI: 0, defT: '-', grace: 0, max: 2, min: 2}
+homophones: {SAE: /home/chris/AAE/stimuli/SAE_deep/pkl/homo.pkl}
+input:
+  ip: phon
+  is: sem
+  w: {sem: warmstart}
+sample_id: 1
+stimuli: {SAE: /home/chris/AAE/stimuli/SAE_deep/pkl/words_pruned.pkl}
+target: {tp: phon, ts: sem}
+warmstart: {distmethod: cityblock, knn: 10, name: warmstart, type: sem}

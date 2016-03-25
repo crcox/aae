@@ -98,7 +98,10 @@ def sample(conn, sample_id):
     cmd_select_phonology = "SELECT phoncode FROM phonology WHERE id=:phonology_id;"
     cmd_select_dialect = "SELECT label FROM dialect WHERE id=:dialect_id";
     cmd_select_phonology_has_rule = "SELECT rule_id FROM phonology_has_rule WHERE phonology_id=:phonology_id";
-
+    cmd_select_example_data = "SELECT dialect_id,word_id,word,frequency,orthography_id,orthcode,phonology_id,phoncode,dialect FROM example_data WHERE sample_id=:sample_id;"
+    cmd_select_orthography_representation = "SELECT orthography_id, grapheme_id,grapheme_unit,orthrep_unit,orthrep_value FROM orthography_representation WHERE sample_id=:sample_id AND orthography_id=:orthography_id AND dialect_id=:dialect_id AND alphabet_id=:alphabet_id AND word_id=:word_id ORDER BY grapheme_unit,orthrep_unit;"
+    cmd_select_phonology_representation = "SELECT phonology_id, phoneme_id,phoneme_unit,phonrep_unit,phonrep_value FROM phonology_representation WHERE sample_id=:sample_id AND phonology_id=:phonology_id AND dialect_id=:dialect_id AND accent_id=:accent_id AND word_id=:word_id ORDER BY phoneme_unit,phonrep_unit;"
+    cmd_select_semantic_representation = "SELECT word_id,semrep_unit,semrep_value FROM semantic_representation WHERE sample_id=:sample_id AND word_id=:word_id AND dialect_id=:dialect_id ORDER BY semrep_unit;"
     example_prototype = {
             "rule_id": 0,
             "freq": 1,
@@ -123,51 +126,50 @@ def sample(conn, sample_id):
         cur.execute("SELECT id,label FROM rule;")
         rule_dict = {r['id']:r['label'] for r in cur.fetchall()}
 
-        sample = []
-        cur.execute(cmd_select_examples, {"sample_id": sample_id})
-        for R in cur.fetchall():
-            ex = copy.deepcopy(example_prototype)
-            dialect_id = R['dialect_id']
-            orthography_id = R['orthography_id']
-            phonology_id = R['phonology_id']
-            word_id = R['word_id']
+        sample = {}
 
-            if use_frequency:
-                cur.execute("SELECT word,frequency FROM word WHERE id=:word_id;", {'word_id':word_id})
-                r = cur.fetchone()
-                word = r['word']
-                freq = r['frequency']
-            else:
-                cur.execute(cmd_select_word, {'word_id': word_id});
-                r = cur.fetchone()
-                word = r['word']
-                freq = 1
+        # Load all sample data into memory at once (should be fine...)
+        cur.execute(cmd_select_example_data, {"sample_id": sample_id})
+        SAMPLE_TBL = cur.fetchall()
+        for R in SAMPLE_TBL:
+            dialect = R['dialect']
+            word = R['word']
 
-            cur.execute(cmd_select_orthography, {'orthography_id': orthography_id})
-            r = cur.fetchone()
-            orthcode = r['orthcode']
+            if not dialect in sample:
+                sample[dialect] = {}
+            if not word in sample[dialect]:
+                sample[dialect][word] = {}
 
-            cur.execute(cmd_select_phonology, {'phonology_id': phonology_id})
-            r = cur.fetchone()
-            phoncode = r['phoncode']
+            sample[dialect][word]["freq"] = R['frequency']
+            sample[dialect][word]["orth_code"] = R['orthcode']
+            sample[dialect][word]["phon_code"] = R['phoncode']
 
-            cur.execute(cmd_select_dialect, {'dialect_id': dialect_id})
-            r = cur.fetchone()
-            dialect = r['label']
+            WHERE = {'sample_id': sample_id, 'word_id':R['word_id'], 'dialect_id': R['dialect_id'], 'orthography_id': R['orthography_id'], 'alphabet_id': alphabet_id}
+            cur.execute(cmd_select_orthography_representation, WHERE)
+            x = []
+            for r in cur.fetchall():
+                try:
+                    x[r['grapheme_unit']].append(r['orthrep_value'])
+                except IndexError:
+                    for i in range(len(x),r['grapheme_unit']+1):
+                        x.append([])
+                    x[r['grapheme_unit']].append(r['orthrep_value'])
+            sample[dialect][word]["orth"] = x
 
-            cur.execute(cmd_select_phonology_has_rule, {'phonology_id': phonology_id})
-            r = cur.fetchone()
-            if r:
-                ex['rule_id'] = r['rule_id']
-            else:
-                ex['rule_id'] = 0
+            WHERE = {'sample_id': sample_id, 'word_id':R['word_id'], 'dialect_id': R['dialect_id'], 'phonology_id': R['phonology_id'], 'accent_id': accent_id}
+            cur.execute(cmd_select_phonology_representation, WHERE)
+            x = []
+            for r in cur.fetchall():
+                try:
+                    x[r['phoneme_unit']].append(r['phonrep_value'])
+                except IndexError:
+                    for i in range(len(x),r['phoneme_unit']+1):
+                        x.append([])
+                    x[r['phoneme_unit']].append(r['phonrep_value'])
+            sample[dialect][word]["phon"] = x
 
-            ex["freq"] = freq
-            ex["orth_code"] = orthcode
-            ex["orth"] = orthrep(conn, orthography_id, alphabet_id)
-            ex["phon_code"] = phoncode
-            ex["phon"] = phonrep(conn, phonology_id, accent_id)
-            ex["sem"] = semrep(conn, word_id)
-            sample.append(copy.deepcopy(ex))
+            WHERE = {'sample_id': sample_id, 'dialect_id':R['dialect_id'], 'word_id': R['word_id']}
+            cur.execute(cmd_select_semantic_representation, WHERE)
+            sample[dialect][word]["sem"] = [r['semrep_value'] for r in cur.fetchall()]
 
     return sample

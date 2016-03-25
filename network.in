@@ -1,0 +1,18 @@
+addNet phonsem -i 6 -t 3 CONTINUOUS
+
+addGroup PhonInput 62 INPUT
+addGroup SemInput 200 INPUT
+addGroup Context 1 INPUT
+addGroup Hidden 200 -BIASED
+addGroup PhonOutput 62 OUTPUT BIASED CROSS_ENTROPY STANDARD_CRIT
+addGroup SemOutput 200 OUTPUT BIASED CROSS_ENTROPY STANDARD_CRIT
+
+connectGroups PhonInput PhonOutput -projection ONE_TO_ONE -mean 6 -range 0
+connectGroups SemInput SemOutput -projection ONE_TO_ONE -mean 6 -range 0
+connectGroups PhonOutput Hidden -projection FULL -mean 0 -range 0.1 -bidirectional
+connectGroups SemOutput Hidden -projection FULL -mean 0 -range 0.1 -bidirectional
+connectGroups PhonOutput PhonOutput -projection FULL -mean 0 -range 0.1
+connectGroups SemOutput SemOutput -projection FULL -mean 0 -range 0.1
+connectGroups Context Hidden -projection FULL -mean 0 -range 0
+connectGroups bias PhonOutput -projection FULL -mean -3 -range 0
+connectGroups bias SemOutput -projection FULL -mean -3 -range 0

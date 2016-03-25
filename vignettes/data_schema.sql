@@ -1,5 +1,6 @@
 PRAGMA synchronous = OFF;
 PRAGMA journal_mode = MEMORY;
+PRAGMA cache_size = 40000;
 BEGIN TRANSACTION;
 CREATE TABLE "version" (
   "id" INTEGER,
@@ -236,7 +237,8 @@ CREATE TABLE "semrep" (
   "unit" INTEGER NOT NULL,
   "value" INTEGER NOT NULL,
   PRIMARY KEY ("corpus_id","word_id","unit")
-  CONSTRAINT "fk_semrep_word1" FOREIGN KEY ("word_id", "corpus_id") REFERENCES "word" ("id", "corpus_id") ON DELETE NO ACTION ON UPDATE NO ACTION
+  CONSTRAINT "fk_semrep_word1" FOREIGN KEY ("word_id") REFERENCES "word" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT "fk_semrep_corpus1" FOREIGN KEY ("corpus_id") REFERENCES "corpus" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 CREATE TABLE "trainscript" (
   "id" INTEGER,
@@ -274,8 +276,63 @@ CREATE TABLE "sample_has_example" (
   CONSTRAINT "fk_sample_has_example_orthography1" FOREIGN KEY ("orthography_id") REFERENCES "orthography" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
   CONSTRAINT "fk_sample_has_example_dialect1" FOREIGN KEY ("dialect_id") REFERENCES "dialect" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
 );
+CREATE VIEW example_data AS
+    SELECT
+      sample.sample_id AS sample_id,
+      word.id AS word_id,
+      word,
+      frequency,
+      dialect.id AS dialect_id,
+      dialect.label AS dialect,
+      orthography.id AS orthography_id,
+      orthcode,
+      phonology.id AS phonology_id,
+      phoncode
+    FROM sample_has_example AS sample
+    JOIN word ON sample.word_id=word.id
+    JOIN orthography ON sample.orthography_id=orthography.id
+    JOIN phonology ON sample.phonology_id=phonology.id
+    JOIN dialect ON sample.dialect_id=dialect.id;
+CREATE VIEW orthography_representation AS
+    SELECT
+      sample.word_id AS word_id,
+      sample.sample_id AS sample_id,
+      sample.dialect_id AS dialect_id,
+      orthography_has_grapheme.orthography_id AS orthography_id,
+      orthography_has_grapheme.grapheme_id AS grapheme_id,
+      orthography_has_grapheme.unit AS grapheme_unit,
+      orthrep.unit AS orthrep_unit,
+      orthrep.value AS orthrep_value,
+      orthrep.alphabet_id AS alphabet_id
+    FROM sample_has_example AS sample
+    JOIN orthography_has_grapheme ON sample.orthography_id=orthography_has_grapheme.orthography_id
+    JOIN orthrep ON orthography_has_grapheme.grapheme_id = orthrep.grapheme_id;
+CREATE VIEW phonology_representation AS
+    SELECT
+      sample.word_id AS word_id,
+      sample.sample_id AS sample_id,
+      sample.dialect_id AS dialect_id,
+      phonology_has_phoneme.phonology_id AS phonology_id,
+      phonology_has_phoneme.phoneme_id AS phoneme_id,
+      phonology_has_phoneme.unit AS phoneme_unit,
+      phonrep.unit AS phonrep_unit,
+      phonrep.value AS phonrep_value,
+      phonrep.accent_id as accent_id
+    FROM sample_has_example AS sample
+    JOIN phonology_has_phoneme ON sample.phonology_id=phonology_has_phoneme.phonology_id
+    JOIN phonrep ON phonology_has_phoneme.phoneme_id = phonrep.phoneme_id;
+CREATE VIEW semantic_representation AS
+    SELECT
+      sample.dialect_id AS dialect_id,
+      sample.sample_id AS sample_id,
+      semrep.word_id AS word_id,
+      unit AS semrep_unit,
+      value AS semrep_value
+  FROM sample_has_example AS sample
+  JOIN semrep ON sample.word_id=semrep.word_id;
 CREATE INDEX "phonrep_fk_phonrep_phoneme1_idx" ON "phonrep" ("phoneme_id");
 CREATE INDEX "phonrep_fk_phonrep_accent1_idx" ON "phonrep" ("accent_id");
+CREATE INDEX "semrep_fk_semrep_word1_idx" ON "semrep" ("word_id");
 CREATE INDEX "job_fk_job_experiment1_idx" ON "job" ("experiment_id","experiment_project_id");
 CREATE INDEX "performance_fk_performance_epoch1_idx" ON "performance" ("epoch_id","epoch_job_id","epoch_job_experiment_id","epoch_job_experiment_project_id");
 CREATE INDEX "epoch_fk_epoch_job1_idx" ON "epoch" ("job_id","job_experiment_id","job_experiment_project_id");

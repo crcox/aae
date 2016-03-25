@@ -1,0 +1,28 @@
+---
+name: PhonInput
+nunits: 250
+type: INPUT
+---
+name: SemInput
+nunits: 200
+type: INPUT
+---
+name: Context
+nunits: 1
+type: INPUT
+---
+criterion: STANDARD_CRIT
+errorType: SUM_SQUARED
+name: PhonOutput
+nunits: 250
+type: OUTPUT
+useHistory: true
+writeOutputs: true
+---
+criterion: STANDARD_CRIT
+errorType: SUM_SQUARED
+name: SemOutput
+nunits: 200
+type: OUTPUT
+useHistory: true
+writeOutputs: true

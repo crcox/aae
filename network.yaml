@@ -1,0 +1,100 @@
+--- # AAE_shallow_phonWS2sem Network
+name: "AAE_shallow_PhonWS2Sem"
+intervals: 6
+ticksPerInterval: 3
+netType: "CONTINUOUS"
+
+layers:
+  - name: "PhonInput"
+    nunits: 63
+    biased: No
+    type: "INPUT"
+
+  - name: "PhonHidden"
+    nunits: 63
+    biased: No
+    type: "HIDDEN"
+
+  - name: "SemInput"
+    nunits: 200
+    type: "INPUT"
+
+  - name: "Context"
+    nunits: 1
+    biased: No
+    type: "INPUT"
+
+  - name: "PhonAttractor"
+    nunits: 100
+    type: "HIDDEN"
+    biased: No
+
+  - name: "SemAttractor"
+    nunits: 100
+    type: "HIDDEN"
+    biased: No
+
+  - name: "Hidden"
+    nunits: 200
+    biased: No
+    type: "HIDDEN"
+
+  - name: "SemOutput"
+    nunits: 200
+    biased: No
+    type: "OUTPUT"
+    errorType: "SUM_SQUARED"
+    criterion: "STANDARD_CRIT"
+    useHistory: Yes
+    writeOutputs: Yes
+
+connections:
+  # patters indicate a A --> B relationship between two groups of units.
+  - pattern: ["PhonInput","PhonHidden"]
+    projection: "ONE_TO_ONE"
+    weights:
+      mean: 6
+      range: 0
+      bidirectional: No
+
+  - pattern: ["SemInput","SemOutput"]
+    projection: "ONE_TO_ONE"
+    weights:
+      mean: 6
+      range: 0
+      bidirectional: No
+
+  - pattern: ["PhonHidden","PhonAttractor"]
+    projection: "FULL"
+    weights:
+      bidirectional: Yes
+
+  - pattern: ["PhonAttractor","PhonAttractor"]
+    projection: "FULL"
+    weights:
+      bidirectional: No
+
+  - pattern: ["PhonHidden","Hidden"]
+    projection: "FULL"
+    weights:
+      bidirectional: Yes
+
+  - pattern: ["SemOutput","SemAttractor"]
+    projection: "FULL"
+    weights:
+      bidirectional: Yes
+
+  - pattern: ["SemAttractor","SemAttractor"]
+    projection: "FULL"
+    weights:
+      bidirectional: No
+
+  - pattern: ["SemOutput","Hidden"]
+    projection: "FULL"
+    weights:
+      bidirectional: Yes
+
+  - pattern: ["Context","Hidden"]
+    projection: "FULL"
+    weights:
+      bidirectional: No

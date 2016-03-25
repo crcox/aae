@@ -98,8 +98,8 @@ sample_id = aae.sql.insert.sample(conn,
 # be manipulated holding everything else constant.
 aae.sql.insert.childsample(conn, sample_id, 0.75)
 
-SAMPLE = aae.sql.select.sample(conn, sample_id)
-for s in SAMPLE:
-    print s
+#SAMPLE = aae.sql.select.sample(conn, sample_id)
+#for s in SAMPLE:
+#    print s
 
 conn.close()

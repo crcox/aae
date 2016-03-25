@@ -1,7 +1,14 @@
 #!/usr/bin/env python
-
-import pickle, yaml, sys, os, shutil
-from lensapi import examples
+import argparse
+import os
+import pkg_resources
+import sqlite3
+import json
+import yaml
+import aae.sql.select
+import aae.utils
+import lensapi.examples
+from mako.template import Template
 # Reminders about Lens example files:
 # - Files begin with a header that set defaults.
 # - The header is terminated with a semi-colon.
@@ -11,165 +18,143 @@ from lensapi import examples
 #   2. Settling---letting the recurrent dynamics happen
 #   3. Evaluation---the targets are presented, and error assessed.
 # - Each event lasts two ticks, so a full trial is 6 ticks.
+resource_package = 'aae'
+
+resource_path_network = os.path.join('template','network.mako')
+network_template_string = pkg_resources.resource_string(resource_package, resource_path_network)
+network_template = Template(network_template_string)
+
+p = argparse.ArgumentParser()
+p.add_argument('database')
+p.add_argument('config')
+p.add_argument('-d','--dialect',type=str,nargs='+',default=[])
+p.add_argument('-o','--output',type=str,default='train.ex')
+p.add_argument('-s','--sample_id',type=str,default=None)
+args = p.parse_args()
+
+DATABASE = args.database
+PATH_TO_JSON = args.config
+DIALECT_SUBSET = args.dialect
+EX_FILENAME = args.output
+IN_FILENAME = os.path.join(os.path.dirname(EX_FILENAME),'network.in')
+TRAINSCRIPT_FILENAME = os.path.join(os.path.dirname(EX_FILENAME),'trainscript.tcl')
 
 # Load instructions
-pathToYAML = sys.argv[1]
-with open(pathToYAML,'r') as f:
-    ydat = [d for d in yaml.load_all(f) if not d is None]
+with open(PATH_TO_JSON,'r') as f:
+    CONFIG = json.load(f)
 
-print ydat
+trainscript_template_filename = "trainscript_{x:s}.mako".format(x=CONFIG['TrainingMethod'])
+resource_path_trainscript = os.path.join('template',trainscript_template_filename)
+trainscript_template_string = pkg_resources.resource_string(resource_package, resource_path_trainscript)
+trainscript_template = Template(trainscript_template_string)
 
-# Parse instructions into phases
-#phases = []
-#for cfg in ydat['phases']:
-#    shared = ydat.copy()
-#    del shared['phases']
-#    shared.update(cfg)
-#    phases.append(shared)
-phases = ydat;
+NetInfoFile = 'network/{s:s}.yaml'.format(s=CONFIG['netname'])
+with pkg_resources.resource_stream('aae',NetInfoFile) as f:
+    NETINFO = yaml.load(f)
 
-ISET = set([v.keys()[0] if isinstance(v,dict)
-        else v
-        for p in phases
-        for v in p['input'].values()])
+NETINFO['netname'] = CONFIG['netname']
+NETINFO['intervals'] = CONFIG['intervals']
+NETINFO['ticksPerInterval'] = CONFIG['ticksPerInterval']
+NETINFO['netType'] = CONFIG['netType']
 
-TSET = set([v.keys()[0] if isinstance(v,dict)
-        else v
-        for p in phases
-        for v in p['target'].values()])
+if args.sample_id:
+    SAMPLE_ID = args.sample_id
+else:
+    SAMPLE_ID = CONFIG['sample_id']
 
-ISET = sorted(list(ISET))
-TSET = sorted(list(TSET))
+FLAG_CONTEXT = CONFIG['context']
 
-# Note whether any phase involves a context unit.
-useContextUnit = any([cfg['context'] for cfg in phases])
+_tmp_list = []
+for value in CONFIG['input'].values():
+    if isinstance(value, dict):
+        _tmp_list.extend(value.keys())
+    else:
+        _tmp_list.append(value)
+ISET = sorted(list(set(_tmp_list)))
 
-# Load and organize the stimuli, and note the words used across all datasets.
-STIM = {}
-words = []
-# Stimuli need to be keyed with the name of the dataset
-for k,path in set([s for cfg in phases for s in cfg['stimuli'].items()]):
-    with open(path,'rb') as f:
-        STIM[k] = pickle.load(f)
-    for w in STIM[k].keys():
-        if not w in words:
-            words.append(w)
-words.sort()
+_tmp_list = []
+for value in CONFIG['target'].values():
+    if isinstance(value, dict):
+        _tmp_list.extend(value.keys())
+    else:
+        _tmp_list.append(value)
+TSET = sorted(list(set(_tmp_list)))
 
-# Add "warmstart" data into the STIM structures.
-WarmCfg_prev = {}
-for cfg in phases:
+# Load sample data
+conn = sqlite3.connect(DATABASE)
+conn.row_factory = sqlite3.Row
+SAMPLE = aae.sql.select.sample(conn, SAMPLE_ID)
+conn.close()
+
+if DIALECT_SUBSET:
+    SAMPLE = dict((dialectLabel, dialectExamples)
+            for dialectLabel,dialectExamples in SAMPLE.items()
+            if dialectLabel in DIALECT_SUBSET)
+
+SAMPLE = aae.utils.prune_representations(SAMPLE)
+
+# Add "warmstart" data into the SAMPLE structures.
+if 'warmstart' in CONFIG:
+    WarmCfg = CONFIG['warmstart']
+    if all(True if k in WarmCfg.keys() else False for k in ['knn','ratio']):
+        print "knn and ratio cannot both be specified."
+        raise ValueError
+    DIST = lensapi.examples.stimdist(SAMPLE,WarmCfg['type'],method=WarmCfg['distmethod'])
     try:
-        WarmCfg = cfg['warmstart']
+        SAMPLE = lensapi.examples.warmstart(SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],knn=WarmCfg['knn'])
     except KeyError:
-        continue
-    if WarmCfg and not WarmCfg == WarmCfg_prev:
-        if all([True if k in WarmCfg.keys() else False for k in ['knn','ratio']]):
-            print "knn and ratio cannot both be specified."
-            raise ValueError
-
-        DIST = examples.stimdist(STIM,WarmCfg['type'],method=WarmCfg['distmethod'])
-
-        try:
-            STIM = examples.warmstart(STIM,DIST,WarmCfg['type'],WarmCfg['name'],knn=WarmCfg['knn'])
-        except KeyError:
-            STIM = examples.warmstart(STIM,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
-
-        WarmCfg_prev = WarmCfg
-
-
+        SAMPLE = lensapi.examples.warmstart(SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
 
 # Build and write representations
-for pnum, cfg in enumerate(phases):
-    fname = 'train.ex'
+with open(EX_FILENAME,'w') as f:
+    lensapi.examples.writeheader(f, CONFIG['header'])
+    for dialectLabel, Dialect in SAMPLE.items():
+        if FLAG_CONTEXT:
+            context = dialectLabel
+        else:
+            context = None
 
-    if len(phases) > 1:
-        pdir = 'phase{n:02d}'.format(n=pnum+1)
-        fdir = os.path.join('ex',pdir)
-    else:
-        fdir = os.path.join('ex')
+        for eventLabel, events in CONFIG['events'].items():
+            # Loop over words and build/write examples
+            Words = sorted(Dialect.keys())
+            for word in Words:
+                EXAMPLE = Dialect[word]
+                name = '{w}_{t}_{k}'.format(w=word,t=eventLabel,k=dialectLabel)
+                inputs = lensapi.examples.buildinput(EXAMPLE,events,CONFIG['input'],context,ISET)
+                targets = lensapi.examples.buildtarget(EXAMPLE,events,CONFIG['target'],context,TSET)
+                if CONFIG['frequency']:
+                    freq = CONFIG['frequency']
+                else:
+                    freq = 1 # everything equally probable
+                lensapi.examples.writeex(f,name,freq,inputs,targets)
 
+# Write Network file
+LayerNames = [layer['name'] for layer in NETINFO['layers']]
+for inputLabel in ISET:
+    layername = '{i}Input'.format(i=inputLabel.title())
+    iLayer = LayerNames.index(layername)
     try:
-        os.makedirs(fdir)
-    except OSError:
-        pass
-    fpath = os.path.join(fdir,fname)
-
-    with open(fpath,'w') as f:
-        examples.writeheader(f, cfg['header'])
-
-        for key in cfg['stimuli'].keys():
-            if useContextUnit:
-                context = key
-            else:
-                context = None
-
-            for template_key, events in cfg['events'].items():
-                # Loop over words and build/write examples
-                for w in words:
-                    name = '{w}_{t}_{k}'.format(w=w,t=template_key,k=key)
-                    WORD = STIM[key][w]
-                    inputs = examples.buildinput(WORD,events,cfg['input'],context,ISET)
-                    targets = examples.buildtarget(WORD,events,cfg['target'],context,TSET)
-                    if cfg['frequency']:
-                        freq = cfg['frequency']
-                    else:
-                        freq = 1 # everything equally probable
-                    examples.writeex(f,name,freq,inputs,targets)
-
-    # Since for the time being, these are always the same stimuli.
-    shutil.copyfile(os.path.join(fdir,'train.ex'),os.path.join(fdir,'test.ex'))
-
-# Write info about IO layers to a YAML file
-IOLayers = []
-for i in ISET:
-    try:
-        rep = [u for sublist in WORD[i] for u in sublist]
+        rep = [u for sublist in EXAMPLE[inputLabel] for u in sublist]
     except:
-        rep = WORD[i]
+        rep = EXAMPLE[inputLabel]
 
-    d = {
-            'name': '{i}Input'.format(i=i.title()),
-            'nunits': len(rep),
-            'type': 'INPUT'
-        }
-    IOLayers.append(d)
+    NETINFO['layers'][iLayer]['nunits'] = len(rep)
 
-if cfg['context']:
-    d = {
-            'name': 'Context',
-            'nunits': 1,
-            'type': 'INPUT'
-        }
-    IOLayers.append(d)
-
-for i in TSET:
+for inputLabel in TSET:
+    layername = '{i}Output'.format(i=inputLabel.title())
+    iLayer = LayerNames.index(layername)
     try:
-        rep = [u for sublist in WORD[i] for u in sublist]
+        rep = [u for sublist in EXAMPLE[inputLabel] for u in sublist]
     except:
-        rep = WORD[i]
+        rep = EXAMPLE[inputLabel]
 
-    d = {
-            'name': '{i}Output'.format(i=i.title()),
-            'nunits': len(rep),
-            'type': 'OUTPUT',
-			"errorType": "SUM_SQUARED",
-            "criterion": "STANDARD_CRIT",
-            "useHistory": True,
-            "writeOutputs": True
-        }
-    IOLayers.append(d)
+    NETINFO['layers'][iLayer]['nunits'] = len(rep)
 
-with open('iolayers.yaml','wb') as f:
-    yaml.dump_all(IOLayers,f,default_flow_style=False, explicit_start=True)
+network_text = network_template.render(NetInfo=NETINFO)
+with open(IN_FILENAME,'w') as f:
+    f.write(network_text.strip())
 
-# Archiving for reference
-#try:
-#    os.makedirs(os.path.join(ydat['expdir'],'yaml'))
-#except OSError:
-#    pass
-
-#with open(os.path.join(ydat['expdir'],'yaml','examples.yaml'),'wb') as f:
-#    yaml.dump(ydat,f,sort_keys=True, indent=2, separators=(',', ': '))
-#with open('iolayers.yaml','wb') as f:
-#    yaml.dump({'layers':IOLayers,'expdir':cfg['expdir']},f,sort_keys=True, indent=2, separators=(',', ': '))
+# Write Trainscript
+trainscript_text = trainscript_template.render(CONFIG=CONFIG)
+with open(TRAINSCRIPT_FILENAME,'w') as f:
+    f.write(trainscript_text.strip())

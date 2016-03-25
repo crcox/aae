@@ -1,0 +1,24 @@
+sample_id: 1
+context: true
+disambiguateHomophones: false
+events:
+  phonWS_semphon:
+    ip: [1, 0, 0]
+    w:  [1, 0, 0]
+    tp: [1, 1, 1]
+    ts: [1, 1, 1]
+  sem_phon:
+    is: [1, 0, 0]
+    tp: [1, 0, 0]
+    ts: [1, 0, 0]
+frequency: false
+header: {actI: 1, actT: 1, defI: 0, defT: '-', grace: 0, max: 2, min: 2}
+homophones: {SAE: /home/chris/AAE/stimuli/SAE_deep/pkl/homo.pkl}
+input:
+  ip: phon
+  is: sem
+  w: {sem: warmstart}
+target:
+  tp: phon
+  ts: sem
+warmstart: {distmethod: cityblock, knn: 10, name: warmstart, type: sem}
