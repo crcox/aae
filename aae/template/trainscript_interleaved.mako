@@ -1,5 +1,5 @@
 <%
-  OutputLayers = ["{name:s}Output".format(name=name.title()) for name in CONFIG['target'].values()]
+  OutputLayers = ["{name:s}Output".format(name=name.title()) for name in NETINFO['target'].values()]
   UpdatesPerCall = CONFIG['UpdatesPerCall']
   weightDecay = CONFIG['weightDecay']
   batchSize = CONFIG['batchSize']
@@ -78,13 +78,13 @@ proc main {} {
     saveWeights $wtfile
   }
 
-  loadExamples [file join "ex" "train.ex"] -exmode PERMUTED
+  loadExamples "train.ex" -set train -exmode PERMUTED
   useTrainingSet train
-  loadExamples [file join "ex" "test.ex"] -exmode ORDERED
+  loadExamples "train.ex" -set test -exmode ORDERED
   useTestingSet test
   set errlog [open [file join "error.log"] w]
   set MFHCcsv [open [file join "MFHC.csv"] w]
-  set errList [errorInUnits $MFHCcsv {${OutputLayers}}]
+  set errList [errorInUnits $MFHCcsv {${' '.join(OutputLayers)}}]
   set PError [summarizeError $errList 0]
   set err [getObj error]
   set errHistory [list]
@@ -117,7 +117,7 @@ proc main {} {
     incr i 1
     if { [expr {$i % $TestEpoch}] == 0 } {
       # Compute the (unit-wise) error
-      set errList [errorInUnits $MFHCcsv {${OutputLayers}}]
+      set errList [errorInUnits $MFHCcsv {${' '.join(OutputLayers)}}]
       set PError [summarizeError $errList 0]
       set wtfile [file join $WeightDir [format "%d.wt" [getObj totalUpdates]]]
       file copy "oneBack.wt" $wtfile
@@ -133,3 +133,10 @@ if { [catch {main} msg] } {
   puts stderr "unexpected script error: $msg"
   exit 1
 }
+
+<%def name="join(x)" filter="trim">
+  <%
+    output = ' '.join(str(i) for i in x)
+  %>
+  output
+</%def>

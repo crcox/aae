@@ -36,3 +36,19 @@ layers:
   nunits: 63, type: OUTPUT, useHistory: true, writeOutputs: true}
 - {biased: true, criterion: STANDARD_CRIT, errorType: CROSS_ENTROPY, name: SemOutput,
   nunits: 200, type: OUTPUT, useHistory: true, writeOutputs: true}
+events:
+  phon_sem:
+  - {ip: 1, tp: 1, ts: 1}
+  - {ip: 0, tp: 1, ts: 1}
+  - {ip: 0, tp: 1, ts: 1}
+  sem_phon:
+  - {is: 1, tp: 1, ts: 1}
+  - {is: 0, tp: 1, ts: 1}
+  - {is: 0, tp: 1, ts: 1}
+header: {actI: 1, actT: 1, defI: 0, defT: '-', grace: 0, max: 2, min: 2}
+input:
+  ip: phon
+  is: sem
+target:
+  tp: phon
+  ts: sem

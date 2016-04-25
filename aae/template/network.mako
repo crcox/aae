@@ -23,10 +23,8 @@ ${add_connection(CONNECTION)}
     if GROUP['type'] in ['INPUT','OUTPUT']:
         line.append(GROUP['type'])
     if GROUP['type'] in ['HIDDEN','OUTPUT']:
-        if GROUP['biased']:
-            line.append('BIASED')
-        else:
-            line.append('-BIASED')
+    # Always remove bias connection so a custom one can be added later.
+        line.append('-BIASED')
     if GROUP['type'] == 'OUTPUT':
         line.append(GROUP['errorType'])
         line.append(GROUP['criterion'])
@@ -49,6 +47,9 @@ ${output}
         line.extend(['-range',CONNECTION['weights']['range']])
     else:
         line.extend(['-range',1])
+
+    if 'type' in CONNECTION and CONNECTION['type']:
+        line.extend(['-type',CONNECTION['type']])
 
     if 'bidirectional' in CONNECTION['weights'] and CONNECTION['weights']['bidirectional']:
         line.append('-bidirectional')

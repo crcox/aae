@@ -728,7 +728,7 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[], ndif
                 examples.append((word_id,phon_id_alt,orth_id,dialect_alt_id))
 
     ndiff_samp = 0
-    for i,j in zip(range(0,len(examples),2),range(0,len(examples),2)):
+    for i,j in zip(range(0,len(examples),2),range(1,len(examples),2)):
         if examples[i][1] != examples[j][1]:
             ndiff_samp += 1
 

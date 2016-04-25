@@ -1,5 +1,5 @@
 <%
-  OutputLayers = ["{name:s}Output".format(name=name.title()) for name in CONFIG['target'].values()]
+  OutputLayers = ["{name:s}Output".format(name=name.title()) for name in NETINFO['target'].values()]
   UpdatesPerCall = CONFIG['UpdatesPerCall']
   weightDecay = CONFIG['weightDecay']
   batchSize = CONFIG['batchSize']
@@ -63,35 +63,40 @@ proc main {} {
   set TestEpoch ${TestEpoch}
   set ErrorCriterion ${ErrorCriterion}
 
-  set WeightDir "./"
+  set WeightDir "./wt"
+  if { ![file exists $WeightDir]} {
+    file mkdir $WeightDir
+  }
 
   resetNet
-  set wtfile [file join $WeightDir [format "init_%d.wt" [getObj totalUpdates]]]
+  set wtfile ${InitialWeights}
   if {[file exists $wtfile]} {
+    puts "Loading ${InitialWeights}..."
     loadWeights $wtfile
   } else {
+    puts "Saving ${InitialWeights}..."
     saveWeights $wtfile
   }
 
-  loadExamples [file join "ex" "train_aae_aw.ex"] -set "train_aae_aw" -exmode PERMUTED
-  loadExamples [file join "ex" "train_aae.ex"] -set "train_aae" -exmode PERMUTED
-  loadExamples [file join "ex" "test.ex"] -exmode ORDERED
-  if {[expr {rand()}] > 0.5} {
+  loadExamples "aae.ex" -set "aae" -exmode PERMUTED
+  loadExamples "sae.ex" -set "sae" -exmode PERMUTED
+  loadExamples "test.ex" -set test -exmode ORDERED
+  if {[expr {rand()}] <%text>></%text> 0.5} {
     set trainToggle 0
-    useTrainingSet "train_aae_aw"
+    useTrainingSet "aae"
   } else {
     set trainToggle 1
-    useTrainingSet "train_aae"
+    useTrainingSet "sae"
   }
   useTestingSet test
-  set errlog [open [file join "phase01_err.log"] w]
-  set MFHCcsv [open [file join "phase01_MFHC.csv"] w]
-  set errList [errorInUnits $MFHCcsv {PhonOutput SemOutput}]
+  set errlog [open "err.log" w]
+  set MFHCcsv [open "MFHC.csv" w]
+  set errList [errorInUnits $MFHCcsv {${' '.join(OutputLayers)}}]
   set PError [summarizeError $errList 0]
   set err [getObj error]
   set errHistory [list]
   set i 0
-  while {$PError > 0.15} {
+  while {$PError <%text>></%text> $ErrorCriterion} {
     train -a steepest
     set err [getObj error]
     if { [llength $errHistory] == 10 } {
@@ -107,7 +112,7 @@ proc main {} {
     }
     # Update and maintain the (cross-entropy) error history.
     lappend errHistory $err
-    if {[llength $errHistory] > 10} {
+    if {[llength $errHistory] <%text>></%text> 10} {
       set errHistory [lrange $errHistory 1 end]
     }
 
@@ -119,9 +124,9 @@ proc main {} {
     incr i 1
     if { [expr {$i % $TestEpoch}] == 0 } {
       # Compute the (unit-wise) error
-      set errList [errorInUnits $MFHCcsv {PhonOutput SemOutput}]
+      set errList [errorInUnits $MFHCcsv {${' '.join(OutputLayers)}}]
       set PError [summarizeError $errList 0]
-      set wtfile [file join $WeightDir [format "phase01_%d.wt" [getObj totalUpdates]]]
+      set wtfile [file join $WeightDir [format "%d.wt" [getObj totalUpdates]]]
       file copy "oneBack.wt" $wtfile
 
       incr trainToggle 1

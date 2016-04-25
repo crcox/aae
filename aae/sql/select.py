@@ -1,5 +1,14 @@
 import operator
 import copy
+def dialect_id(conn, dialect):
+    cmd_select_dialect_id = "SELECT id FROM dialect WHERE label=:dialect;"
+    with conn:
+        cur = conn.cursor()
+        cur.execute(cmd_select_dialect_id, {'dialect': dialect})
+        r = cur.fetchone()
+
+    return r['id']
+
 def phonology(conn, phonology_id):
     cmd_select_phonology = "SELECT phoncode FROM phonology WHERE id=:phonology_id;"
     with conn:
@@ -90,7 +99,7 @@ def semrep(conn, word_id):
 
     return rep
 
-def sample(conn, sample_id):
+def sample(conn, sample_id, accent_id=None):
     cmd_select_sample = "SELECT accent_id,alphabet_id,corpus_id,dialect_root_id,dialect_alt_id,use_frequency FROM sample WHERE id=:sample_id;"
     cmd_select_examples = "SELECT word_id,phonology_id,orthography_id,dialect_id FROM sample_has_example WHERE sample_id=:sample_id;"
     cmd_select_word = "SELECT word FROM word WHERE id=:word_id";
@@ -117,7 +126,8 @@ def sample(conn, sample_id):
         cur.execute(cmd_select_sample, {"sample_id": sample_id})
         r = cur.fetchone()
         alphabet_id = r['alphabet_id']
-        accent_id = r['accent_id']
+        if not accent_id:
+            accent_id = r['accent_id']
         corpus_id = r['corpus_id']
         dialect_root_id = r['dialect_root_id']
         dialect_alt_id = r['dialect_alt_id']

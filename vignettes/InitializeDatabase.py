@@ -61,21 +61,6 @@ aae.sql.insert.orthography_has_graphemes(conn, update=False)
 #### associated with a particular word, given a particular corpus, alphabet, and
 #### dialect.
 
-# Sample
-# A sample can be generated according to the following guidelines. The sample
-# will be inserted directly into the database. The return value of the function
-# is the sample id, and all examples contained in the sample will be associated
-# with this id.
-aae.sql.insert.sample(conn,
-    corpus="3k",
-    dialect_root="SAE",
-    dialect_alt="AAE",
-    accent="standard",
-    alphabet="orthogonal",
-    n=500,
-    ndiff=250,
-    nhomo_root=20)
-
 ## A sample can be explicitly defined.
 with open("original_stimlist_500_250.txt", "r") as f:
     stimlist=[x.strip() for x in f.readlines()]
@@ -97,9 +82,25 @@ sample_id = aae.sql.insert.sample(conn,
 # time. Allows for the number of differences between dialects in the sample to
 # be manipulated holding everything else constant.
 aae.sql.insert.childsample(conn, sample_id, 0.75)
+aae.sql.insert.childsample(conn, sample_id, 0.50)
 
-#SAMPLE = aae.sql.select.sample(conn, sample_id)
-#for s in SAMPLE:
-#    print s
+# Sample
+# A sample can be generated according to the following guidelines. The sample
+# will be inserted directly into the database. The return value of the function
+# is the sample id, and all examples contained in the sample will be associated
+# with this id.
+for i in range(100):
+    print i
+    sample_id = aae.sql.insert.sample(conn,
+        corpus="3k",
+        dialect_root="SAE",
+        dialect_alt="AAE",
+        accent="standard",
+        alphabet="orthogonal",
+        n=500,
+        ndiff=250,
+        nhomo_root=20)
+    aae.sql.insert.childsample(conn, sample_id, 0.75)
+    aae.sql.insert.childsample(conn, sample_id, 0.50)
 
 conn.close()
