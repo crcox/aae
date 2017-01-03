@@ -10,7 +10,7 @@ import aae.utils
 import lensapi.examples
 from mako.template import Template
 # Reminders about Lens example files:
-# - Files begin with a header that set defaults.
+# - Files begin with a header that sets defaults.
 # - The header is terminated with a semi-colon.
 # - Each ``trial'' can be composed of many events.
 # - In this model, there are three events:
@@ -25,7 +25,7 @@ network_template_string = pkg_resources.resource_string(resource_package, resour
 network_template = Template(network_template_string)
 
 p = argparse.ArgumentParser()
-p.add_argument('-D','--database',type=str,default='')
+p.add_argument('-D','--database',type=str,default='',help="Supply a path to a sqlite database file. Otherwise, the default database for your installation is used. See the README for how to install a default database.")
 p.add_argument('config')
 p.add_argument('-d','--dialect',type=str,nargs='+',default=[])
 p.add_argument('-a','--accent',type=str,nargs='+',default=[])
