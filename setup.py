@@ -17,8 +17,17 @@ setup(
     license = "MIT",
     keywords = "LCNL PDP AAE",
     url = "http://packages.python.org/an_example_pypi_project",
-    packages=['aae'],
-    long_description=read('README'),
+    packages=['aae','aae.lens','aae.network','aae.sql','aae.template'],
+    scripts = ['bin/buildNetFiles.py'],
+    install_requires = ['mako','pyyaml','numpy','scipy'],
+    package_dir = {'aae': 'aae/'},
+    package_data = {
+        'aae': [
+            'template/*.mako',
+            'network/*.yaml'
+        ]
+    },
+    long_description=read('README.md'),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Topic :: Utilities",
