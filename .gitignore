@@ -1,3 +1,6 @@
 *.pyc
 *.db
 aae/database
+aae.egg-info/SOURCES.txt
+aae.egg-info/requires.txt
+dist/

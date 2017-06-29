@@ -39,9 +39,10 @@ else:
     DATABASE = pkg_resources.resource_filename(resource_package,'database/main.db')
 
 PATH_TO_JSON = args.config
-EX_FILENAME = args.output
-IN_FILENAME = os.path.join(os.path.dirname(EX_FILENAME),'network.in')
-TRAINSCRIPT_FILENAME = os.path.join(os.path.dirname(EX_FILENAME),'trainscript.tcl')
+OUTDIR = os.path.dirname(PATH_TO_JSON)
+EX_FILENAME = os.path.join(OUTDIR,args.output)
+IN_FILENAME = os.path.join(OUTDIR,'network.in')
+TRAINSCRIPT_FILENAME = os.path.join(OUTDIR,'trainscript.tcl')
 
 # Load instructions
 with open(PATH_TO_JSON,'r') as f:
