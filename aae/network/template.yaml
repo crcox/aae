@@ -1,0 +1,154 @@
+# This yaml-formatted file defines the network architecture a model that will
+# bi-directionally map Phonology and Semantics (no orthography) with "warm
+# starting". This file is specified as yaml, rather than in LENS specific
+# terms, for several reasons:
+#
+#  1. These data can be flexibly referenced and logged without needing to parse
+#     a non-standard script.
+#
+#  2. It can be converted into convenient structured data within any
+#     programming language with a yaml processor (such as Python, R, C/++,
+#     Perl, Ruby, and just about everything).
+#
+# The yaml format is very flexible, which is a blessing and a curse. The
+# specification is so comprehensive/elaborate/Byzantine that it is not worth
+# mastering in it's entirety, but rather take what you need and keep it as
+# simple as possible. These are the basics:
+#
+#  - a string followed by a colon is a key, and the thing following the colon
+#    will be the value. So:
+#
+#      A: 1
+#
+#    sets the key A to contain the value 1. When parsed, it will yield a
+#    structure with the field A populated with the number 1.
+#
+#  - A value can be a scalar value, a string, a list, or a sub-branch of
+#    key-value pairs. So:
+#
+#      A: {a: [1,2,3], b: [4,5,6]}
+#
+#    Would be parsed as a structure with a field A, which contains a sub
+#    structure with two fields a and b, each containing a list of numbers.
+#
+#  - A value can also be a list of branches... I think you can see where this
+#    is going. You can make arbitrarily complex structures of lists and branches.
+#
+#  - The thing to keep in mind, though, is that there is more than one way to
+#    say the same thing in yaml. For instance, the example above could also be
+#    expressed as:
+#
+#      A:
+#        a:
+#          - 1
+#          - 2
+#          - 3
+#        b:
+#          - 4
+#          - 5
+#          - 6
+#
+#  - Throughout this file, I adopt the syntax that is most legible for me in
+#    context. But this means that the syntax varies. 
+#
+#  - Fortunately, the yaml specification allows for comments! This is one of
+#    the largest advantages over json. I will attempt to make this file as
+#    clear as I can as an example for future network descriptions.
+#
+#  Best of luck,
+#   Chris
+
+# EXAMPLE FILE HEADER
+# ===================
+# This exactly echoes the standard header definitions for LENS example files
+# (http://tedlab.mit.edu/~dr/Lens/exampleFiles.html).
+header:
+    - actI: 1
+    - actT: 1
+    - defI: 0
+    - defT: '-'
+    - grace: 0
+    - max: 2
+    - min: 2
+
+# WARM-START SPECIFICATIONS
+# =========================
+# Warm-starting is a way of biasing the semantic ouput representation into the
+# right part of semantic space. It is a way of handling homophones. The logic
+# that, in natural speech, the context strongly helps disambiguate among
+# homophones. Because this is model of single word comprehension, there is no
+# context of this kind. The warm-start solution is to take some number of
+# representations in the neighborhood of the target and average them together,
+# and inject them directly into the output layer. When the phonology arrives,
+# the goal is to then sharpen the semantic representation to correspond to a
+# single concept.
+warmstart: 
+    - distmethod: cityblock
+    - knn: 10
+    - name: warmstart
+    - type: sem
+
+input:
+    ip: phon
+    is: sem
+    w: {sem: warmstart}
+
+target:
+    tp: phon
+    ts: sem
+
+events:
+  phon_sem:
+  - {ip: 1, tp: 1, ts: 1, w: 1}
+  - {ip: 0, tp: 1, ts: 1, w: 0}
+  - {ip: 0, tp: 1, ts: 1, w: 0}
+  sem_phon:
+  - {is: 1, tp: 1, ts: 1}
+  - {is: 0, tp: 1, ts: 1}
+  - {is: 0, tp: 1, ts: 1}
+
+layers:
+- {type: INPUT,  nunits:  63, biased: false, name: PhonInput }
+- {type: INPUT,  nunits: 200, biased: false, name: SemInput  }
+- {type: INPUT,  nunits:   1, biased: false, name: Context   }
+- {type: HIDDEN, nunits: 200, biased: false, name: Hidden    }
+- {type: OUTPUT, nunits:  63, biased: true,  name: PhonOutput, criterion: STANDARD_CRIT, errorType: CROSS_ENTROPY, useHistory: true, writeOutputs: true}
+- {type: OUTPUT, nunits: 200, biased: true,  name: SemOutput,  criterion: STANDARD_CRIT, errorType: CROSS_ENTROPY, useHistory: true, writeOutputs: true}
+
+connections:
+# patterns indicate a A --> B relationship between two groups of units.
+- pattern: [PhonInput, PhonOutput]
+  projection: ONE_TO_ONE
+  weights: {bidirectional: false, mean: 6, range: 0}
+
+- pattern: [SemInput, SemOutput]
+  projection: ONE_TO_ONE
+  weights: {bidirectional: false, mean: 6, range: 0}
+
+- pattern: [PhonOutput, Hidden]
+  projection: FULL
+  weights: {bidirectional: true, mean: 0, range: 0.1}
+
+- pattern: [SemOutput, Hidden]
+  projection: FULL
+  weights: {bidirectional: true, mean: 0, range: 0.1}
+
+- pattern: [PhonOutput, PhonOutput]
+  projection: FULL
+  weights: {bidirectional: false, mean: 0, range: 0.1}
+
+- pattern: [SemOutput, SemOutput]
+  projection: FULL
+  weights: {bidirectional: false, mean: 0, range: 0.1}
+
+- pattern: [Context, Hidden]
+  projection: FULL
+  weights: {bidirectional: false, mean: 0, range: 0}
+
+- pattern: [bias, PhonOutput]
+  projection: FULL
+  weights: {bidirectional: false, mean: -3, range: 0}
+
+- pattern: [bias, SemOutput]
+  projection: FULL
+  weights: {bidirectional: false, mean: -3, range: 0}
