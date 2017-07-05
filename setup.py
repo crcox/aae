@@ -19,12 +19,12 @@ setup(
     url = "http://packages.python.org/an_example_pypi_project",
     packages=['aae','aae.lens','aae.network','aae.sql','aae.template'],
     scripts = ['bin/buildNetFiles.py'],
-    install_requires = ['mako','pyyaml','numpy','scipy'],
-    package_dir = {'aae': 'aae/'},
+    install_requires = ['mako','pyyaml','numpy'],
+    package_dir = {'aae': os.path.join('aae')},
     package_data = {
         'aae': [
-            'template/*.mako',
-            'network/*.yaml'
+            os.path.join('template','*.mako'),
+            os.path.join('network','*.yaml')
         ]
     },
     long_description=read('README.md'),
