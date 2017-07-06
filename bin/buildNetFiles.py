@@ -36,7 +36,7 @@ args = p.parse_args()
 if args.database:
     DATABASE = args.database
 else:
-    DATABASE = pkg_resources.resource_filename(resource_package,'database/main.db')
+    DATABASE = pkg_resources.resource_filename(resource_package,'database/initial.db')
 
 PATH_TO_JSON = args.config
 OUTDIR = os.path.dirname(PATH_TO_JSON)
@@ -72,16 +72,16 @@ trainscript_template_string = pkg_resources.resource_string(resource_package, re
 trainscript_template = Template(trainscript_template_string)
 
 if 'warmstart' in CONFIG and CONFIG['warmstart']:
-    NetInfoFile = 'network/{s:s}_warmstart.yaml'.format(s=CONFIG['netname'])
+    # NetInfoFile = 'network/{s:s}_warmstart.yaml'.format(s=CONFIG['NetworkArchitecture'])
+    NetInfoFile = 'network/{s:s}.yaml'.format(s=CONFIG['NetworkArchitecture'])
 else:
-    NetInfoFile = 'network/{s:s}.yaml'.format(s=CONFIG['netname'])
+    NetInfoFile = 'network/{s:s}.yaml'.format(s=CONFIG['NetworkArchitecture'])
+
 with pkg_resources.resource_stream('aae',NetInfoFile) as f:
     NETINFO = yaml.load(f)
 
-NETINFO['netname'] = CONFIG['netname']
-NETINFO['intervals'] = CONFIG['intervals']
-NETINFO['ticksPerInterval'] = CONFIG['ticksPerInterval']
-NETINFO['netType'] = CONFIG['netType']
+for k in CONFIG.keys():
+    NETINFO[k] = CONFIG[k]
 
 if args.sample_id:
     SAMPLE_ID = args.sample_id
@@ -120,7 +120,7 @@ if DIALECT_SUBSET:
 SAMPLE = aae.utils.prune_representations(SAMPLE)
 
 # Add "warmstart" data into the SAMPLE structures.
-if 'warmstart' in NETINFO:
+if 'warmstart' in NETINFO and NETINFO['warmstart']:
     WarmCfg = NETINFO['warmstart']
     if all(True if k in WarmCfg.keys() else False for k in ['knn','ratio']):
         print "knn and ratio cannot both be specified."

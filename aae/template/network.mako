@@ -1,8 +1,8 @@
 <%
-  name = NetInfo['netname']
+  name = NetInfo['NetworkArchitecture']
   intervals = NetInfo['intervals']
   ticksPerInterval = NetInfo['ticksPerInterval']
-  netType = NetInfo['netType']
+  netType = NetInfo['NetworkType']
   layers = NetInfo['layers']
   connections = NetInfo['connections']
 %>

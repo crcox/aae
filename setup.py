@@ -24,6 +24,7 @@ setup(
     package_data = {
         'aae': [
             os.path.join('template','*.mako'),
+            os.path.join('database','initial.db'),
             os.path.join('network','*.yaml')
         ]
     },

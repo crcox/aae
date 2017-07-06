@@ -7,7 +7,10 @@ import aae.sql
 from aae.accents import standard as PHON_MAP
 from aae.semantics import standard_3k as SEM_MAP
 
-db_name = "./aae_base.db"
+if not os.path.isdir('../aae/database'):
+    os.mkdir('../aae/database')
+
+db_name = "../aae/database/initial.db"
 db_schema = "./data_schema.sql"
 stim_master = "../raw/3kdict"
 
