@@ -1,39 +1,275 @@
-netname: "phonsem"
-intervals: 6
-ticksPerInterval: 3
-netType: "CONTINUOUS"
-sample_id: 2
+# NETWORK ARCHITECTURE
+# ====================
+# This will either be either:
+# - phonsem
+# - orthphonsem
+#
+# phonsem will initialize the "default" network architecture that includes only
+# phonology and semantics, and orthphonsem will initialize the default network
+# architecture the includes all three modalities. 
+NetworkArchitecture: "phonsem"
+
+# TRAINING METHOD AND SAMPLE
+# ==========================
+# There are essentially three training methods currently implemented:
+#     1. Isolated (AAE or SAE)
+#     2. Blocked
+#     3. Interleaved
+#
+# Isolated training means that the model will be trained only on one or the
+# other language to criterion, and then the training will cease.
+# *** N.B. Isolated training is indicated by entering either AAE or SAE as the
+# ***      TrainingMethod.
+#
+# Blocked training means that which langauge the model is being trained on will
+# alternate after each time the model is tested (i.e., after each TestEpoch).
+#
+# Interleaved training means that AAE and SAE are randomly intermixed. Both
+# languages exist in the same example file, and are looped over in permuted
+# order.
+#
+# Context
+# -------
+# In this model architecture, context is just a single unit that takes on a 1
+# for AAE, and 0 for SAE. In the phonsem model, it projects into the hidden
+# layer between phonology and semantics (the only hidden layer in the model).
+# In the orthphonsem model, it projects to all three hidden layers (between
+# phonology and semantics, semantics and orthography, and orthography and
+# phonology). It only makes a difference within blocked and interleaved
+# training methods, and should otherwise be false (it removes that unit from
+# the network all together---one fewer weight to worry about).
+#
+# Frequency
+# ---------
+# Each stimulus in the database has an associated frequency (based on some
+# corpus analysis---I need to look up the reference/methodology for deriving).
+# LENS can scale the probability of seeing an example on any given trial by
+# this frequency. If this is what you want, set frequency to true. If you want
+# all items in the corpus to be presented with equal probability, then set
+# frequency to false.
+#
+# Sample ID
+# ---------
+# Rather than training on the whole corpus, the code is set up to run on
+# samples of the corpus. A sample might be defined to include the whole corpus,
+# but nevertheless a sample must be defined in advance of running a model and
+# the sample you want to use needs to be specified here based on its index in
+# the database. [Need to add a reference to how to add samples to the data base
+# and how to retrieve their indexes by criteria].
+TrainingMethod: ["AAE","SAE"]
 context: true
-disambiguateHomophones: false
-events:
-  phon_sem:
-  - {ip: 1, tp: 1, ts: 1, w: 1}
-  - {ip: 0, tp: 1, ts: 1, w: 0}
-  - {ip: 0, tp: 1, ts: 1, w: 0}
-  sem_phon:
-  - {is: 1, tp: 1, ts: 1}
-  - {is: 0, tp: 1, ts: 1}
-  - {is: 0, tp: 1, ts: 1}
 frequency: false
-header: {actI: 1, actT: 1, defI: 0, defT: '-', grace: 0, max: 2, min: 2}
-input:
-  ip: phon
-  is: sem
-  w: {sem: warmstart}
-target:
-  tp: phon
-  ts: sem
-warmstart: {distmethod: cityblock, knn: 10, name: warmstart, type: sem}
+sample_id: [1,2,3,4,5,6,7,8,9,10]
+accent: 1
+
+# DISAMBIGUATION OF ORTHOGRAPHY/PHONOLOGY
+# =======================================
+# There are two implemented ways to disambiguate homophones and homographs.
+#
+# Disambiguate
+# ------------
+# The "disambiguate" method adds a unit to the input that distinguishes them.
+# More precisely, the procedure involves looking at the whole sample,
+# determining the phonology (or orthography) with the largest number of
+# homophones (or homographs) and addes the number of units to add a unique
+# binary code to each set of homophones. A phonology consisting of 4 homophones
+# could be disambiguated with 2 units, taking the states [0,0], [0,1], [1,0],
+# [1,1]. If most homophones associated with any phonology was 5, then 3 units
+# would be added to the phonological input, and these units would be used as
+# resources for disambiguating all homophones within the data. This is all just
+# to say, the disambiguation of hhomophones within the sample is done with the
+# most efficient code possible.
+#
+# Warmstart
+# ---------
+# Warm-starting is a way of biasing the semantic ouput representation into the
+# right part of semantic space. The logic that, in natural speech, the context
+# strongly helps disambiguate among homophones and homographs. Because this is
+# a model of single word comprehension, there is no context of this kind. The
+# warm-start solution is to take some number of representations in the
+# neighborhood of the target and average them together, and inject them
+# directly into the output layer. When the phonology arrives, the goal is to
+# then sharpen the semantic representation to correspond to a single concept.
+#
+# N.B. The below are the default values, expressed directly within the phonsem
+# and orthphonsem network default templates. To alter the defaults, uncomment
+# (and remove the indentation), and input the new parameters.
+#
+#     disambiguateHomophones: false
+#     warmstart:
+#         - distmethod: cityblock
+#         - knn: 10
+#         - name: warmstart
+#         - type: sem
+
+# TRAINING SCRIPT PARAMETERS
+# ==========================
+# Error Criterion
+# ---------------
+# The model is evaluated against a custom error term, which is the proportion
+# of test items that have any unit activations on the "wrong side of 0.5". By
+# this, I mean that an output representation is marked incorrect if any unit
+# activation is closer to the wrong state than to the correct state. Note that
+# output units are expressed through a sigmoid function, and so are bounded
+# [0,1]. And ErrorCriterion of 0.2 says that the model will stop training when
+# at least 80% of the examples in the test set have all their output
+# activations within 0.5 of to the target.
+#
+# N.B. An alternative error metric might be the the output pattern, cast as a
+# point in a high dimensionsal space, is closer to the target pattern (another
+# point in the same high dimensional space) than to any other pattern. This may
+# be more appropriate, and should be implemented as an option.
+ErrorCriterion: 0.20
+
+# TestEpoch
+# ---------
+# This affects how many training loops will occur before each time the model is
+# tested. TestEpoch=50 means to call the train command in LENS 50 times before
+# testing. The number of examples seen on each call to the train command is
+# determined by the batchSize option in the next section. If Updates per call
+# is 20 and batchSize is 25 then the model will see 20 batches of 25 items each
+# time the train command is called. This exposes the model to 500 examples over
+# this bit of training. If TestEpoch is 50, then the model will be tested after
+# every 50 calls to the train command, or after ever 25000 examples it sees.
+TestEpoch: 50
+
+# Misc. LENS training parameters
+# ------------------------------
+# These are a collection of parameters that affect how the model will learn.
+# The first set of parameters will be plugged directly into LENS, and affect
+# the learning rate, whether momentum is used, weight decay, etc. Consult the
+# LENS manual for details on how each will effect learning.
 testGroupCrit: 0.5
 targetRadius: 0
-UpdatesPerCall: 20
+UpdatesPerCall: 20 # corresponds to numUpdates in LENS
 weightDecay: 0
-batchSize: 25
+batchSize: 25  # This might be too low... Maybe adjust this to be higher, and
+               # UpdatesPerCall or TestEpoch to be a bit lower.
 zeroErrorRadius: 0
-learningRate: 0.005
+learningRate: 0.005 # This might be too low.
 momentum: 0
-reportInterval: 20
+reportInterval: 20 # In updates
+
+# Handling missteps in error space
+# --------------------------------
+# Sometimes the model will adopt a weight update that makes the error "blow
+# up". This might mean that the step size is too large. There is a custom tcl
+# procedure that monitors for these blow ups, reverts to the state just before
+# the blowup, and halves the learning rate before trying to take that step
+# again.
+#
+# A few things of note. This is done with respect to the error LENS itself is
+# tracking, which is determined by how the OUTPUT layers were defined. The
+# default in the phonsem and orthphonsem network templates is CROSSENTROY. The
+# SpikeThreshold is in standard deviation units, with respect to the Error
+# History (errHistory in the trainscript.tcl). The size of the error history is
+# determined by HistorySize The trainscript keeps track of a number of errors.
+# Another quirk to keep in mind: these errors are logged after each call to
+# train rather than each call to test. So it is actually error on the training
+# set that determines this. These two perhaps counter intuitive design choices
+# were made because I developed the idea after watching the error plot in LENS,
+# and these are the data points that it displays.
+#
+# If the spike threshold is 5 and history size is 10, then if the error jumps
+# by 5 standard deviations (relative to the past 10 tracked errors), the model
+# essentially rewinds to immediately before the offending training cycle,
+# halves the learning rate, and then calls the train command again. The spike
+# threshold is then adjusted to be SpikeThreshold*SpikeThresholdStepSize. This
+# is a way of making the thresold more of less conservative, to help prevent
+# the model from just getting stuck in a situation where the model keeps
+# tripping the threshold (and driving the learning rate lower and lower).
 SpikeThreshold: 5.0
 SpikeThresholdStepSize: 1.5
-TestEpoch: 50
-ErrorCriterion: 0.20
+HistorySize: 10
+
+# EXTERNAL FILES
+# ==============
+# These are all dependencies. Just make sure that the paths indicated below
+# point to the files on your system.
+#
+# Wrapper - This is the script that will launch LENS in the HTCondor
+#     environment.
+# ProcFiles - Here is where files the define any custom Tcl procedures should
+#     be listed.
+Wrapper: "/home/naru/src/lens/run_Lens.sh"
+ProcFiles:
+  - /home/naru/src/aae/tcl/detectSpike.tcl
+  - /home/naru/src/aae/tcl/errorInUnits.tcl
+  - /home/naru/src/aae/tcl/summarizeError.tcl
+
+# CONDOR TOOLS
+# ============
+# These options control setupJobs, a command contained within condortools. They
+# are bit unique, in that they are sort of "meta fields". The arguments they
+# accept are expected to correspond to names of fields specified previously in
+# the file. So, for example, COPY: ProcFiles tells setupJobs that the items
+# listed under ProcFiles are files that need to be sent along to whatever
+# system will run the job.
+#
+# EXPAND may be the most important aspect of this whole file. It accepts fields
+# that contain a list. Each element in the list will be assigned to a separate
+# job. If multiple fields are provided to EXPAND, their lists are crossed.
+# Fields nested in sublists under EXPAND are linked. If a field name is
+# suffixed with a "_", then it is links relative to the length of it's sublists
+# (under the assumption that the list of lists basically describes a matrix).
+# This is all better explained through examples.
+#
+# The long and short is that EXPAND is a way for you to list parameterizations
+# in this file, and break this file up into lots of sub-jobs that can be run in
+# parallel in condor (or in serial on your desktop.
+#
+# Example 1:
+# a: [1,2]
+# b: [1,2]
+# EXPAND: [a,b]
+# ==> 4 jobs
+#    "a": 1, "b": 1
+#    "a": 1, "b": 2
+#    "a": 2, "b": 1
+#    "a": 2, "b": 2
+#
+# Example 2:
+# a: [1,2]
+# b: [1,2]
+# EXPAND: [[a,b]]
+# ==> 2 jobs
+#    "a": 1, "b": 1
+#    "a": 2, "b": 2
+#
+# Example 3:
+# a: [1,2]
+# b: [1,2]
+# EXPAND: []
+# ==> 1 job
+#    "a": [1,2], "b": [1,2]
+#
+# Example 4: 
+# a: [1,2,3]
+# b: [1,2]
+# c: [[1,2],[3,4],[5,6]]
+# EXPAND:
+#    - [a, c]
+#    - [b, c_]
+# ==> 6 jobs
+#    "a": 1, "b": 1, "c": 1
+#    "a": 2, "b": 1, "c": 3
+#    "a": 3, "b": 1, "c": 5
+#    "a": 1, "b": 2, "c": 2
+#    "a": 2, "b": 2, "c": 4
+#    "a": 3, "b": 2, "c": 6
+#
+# *** N.B. This use case has a bug, whereby the reference with '_' MUST come
+# ***      second in order to get the intended behaviour.
+#
+# COPY and URLS: Both expect fields that contain a file path or list of file
+# paths. Files are either copied into the job file structure or written into a
+# URLS file (which are referenced on the execute-node of a distributed job to
+# retrieve files from a proxy server). These operations happen after EXPAND
+# takes effect, so lists of files can be distributed to specific jobs.
+COPY:
+  - Wrapper
+  - ProcFiles
+URLS: []
+EXPAND:
+  - TrainingMethod
+  - sample_id
