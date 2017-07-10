@@ -78,14 +78,13 @@ def corpus(conn, label, description='', word_labels=[]):
 
 def phoneme_representations(conn, accent, phonmap, verbose=False):
     """
-    Insert accent into database.
+    Associate input/target patterns with phonemes within an accent.
 
     # Register a accent
-    >>> aae.sql.insert.corpus(conn, "standard")
-
-    # Register a accent with a description
-    >>> aae.sql.insert.corpus(conn, "mild", "Only vowels differ from standard.")
-    >>> aae.sql.insert.corpus(conn, "strong", "Both vowels and consonants differ from standard.")
+    >>> phonmap = {'a':[0,1]}
+    >>> aae.sql.insert.phoneme_representation(conn, "standard", phonmap)
+    >>> phonmap = {'a':[1,1]}
+    >>> aae.sql.insert.phoneme_representation(conn, "alternative", phonmap)
 
     """
     cmd_insert = "INSERT INTO phonrep (accent_id,phoneme_id,unit,value) VALUES (?,?,?,?);"
@@ -102,7 +101,7 @@ def phoneme_representations(conn, accent, phonmap, verbose=False):
             r = cur.fetchone()
             if r is None:
                 if verbose:
-                    print "Adding phoneme `"+phoneme+"` to database."
+                    print "Adding a new representation for phoneme `"+phoneme+"` within accent '{}'.".format(accent)
                 phonemes(conn, phoneme)
                 cur.execute(cmd_select_phoneme_id, {'phoneme': phoneme})
                 r = cur.fetchone()
@@ -116,10 +115,10 @@ def accent(conn, label, description='', phonmap={}):
     """
     Insert accent into database.
 
-    # Register a accent
+    # Register an accent
     >>> aae.sql.insert.accent(conn, "standard")
 
-    # Register a accent with a description
+    # Register an accent with a description
     >>> aae.sql.insert.accent(conn, "mild", "Only vowels differ from standard.")
     >>> aae.sql.insert.accent(conn, "strong", "Both vowels and consonants differ from standard.")
 
