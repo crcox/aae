@@ -1,6 +1,8 @@
+from __future__ import absolute_import, division, print_function
 import sqlite3
 import random
-import aae
+import aae.parse
+import aae.rules
 # N.B. SQL statements built with the Python "string".format() method are not
 # protected against SQL Injection Attacks. This code is not intended to be web
 # hosted or to record sensitive information.
@@ -102,7 +104,7 @@ def phoneme_representations(conn, accent, phonmap, verbose=False):
             r = cur.fetchone()
             if r is None:
                 if verbose:
-                    print "Adding phoneme `"+phoneme+"` to database."
+                    print("Adding phoneme `"+phoneme+"` to database.")
                 phonemes(conn, phoneme)
                 cur.execute(cmd_select_phoneme_id, {'phoneme': phoneme})
                 r = cur.fetchone()
@@ -179,7 +181,7 @@ def dialect_has_rules(conn, dialect_label, has_rules, verbose=False):
             r = cur.fetchone()
             if r is None:
                 if verbose:
-                    print "Adding rule `"+rule+"` to database."
+                    print("Adding rule `"+rule+"` to database.")
                 rule(conn, rule_label)
                 cur.execute(cmd_select_rule_id, {'rule': rule_label})
                 r = cur.fetchone()
@@ -268,7 +270,7 @@ def phonology(conn, corpus_label, dialect_label, phoncodemap):
         cur.execute(cmd_select_dialect_id, {'dialect': dialect_label})
         r = cur.fetchone()
         dialect_id = r['id']
-        print '************ ' + str(dialect_id)
+        print('************ ' + str(dialect_id))
         cur.execute(cmd_select_rules, {'dialect_id': dialect_id})
         rules = cur.fetchall()
 
@@ -358,10 +360,10 @@ def phonology_has_phonemes(conn, update=False, verbose=False):
                 phoneme_ids = [phoneme_to_id[p] for p in phoncode]
                 n = len(phoncode)
                 if verbose:
-                    print "-"*20
-                    print '|'.join(["{x:>2}".format(x=s) for s in phoncode])
-                    print '|'.join(["{x:02d}".format(x=d) for d in phoneme_ids])
-                    print "phonology_id: " + str(phonology_id)
+                    print("-"*20)
+                    print('|'.join(["{x:>2}".format(x=s) for s in phoncode]))
+                    print('|'.join(["{x:02d}".format(x=d) for d in phoneme_ids]))
+                    print("phonology_id: " + str(phonology_id))
                 row = zip([phonology_id]*n, phoneme_ids, range(n))
                 values.extend(row)
         cur.executemany(cmd_insert, values)
@@ -476,10 +478,10 @@ def orthography_has_graphemes(conn, update=False, verbose=False):
                 grapheme_ids = [grapheme_to_id[g] for g in orthcode]
                 n = len(orthcode)
                 if verbose:
-                    print "-"*20
-                    print '|'.join(["{x:>2}".format(x=s) for s in orthcode])
-                    print '|'.join(["{x:02d}".format(x=d) for d in grapheme_ids])
-                    print "orthography_id: " + str(orthography_id)
+                    print("-"*20)
+                    print('|'.join(["{x:>2}".format(x=s) for s in orthcode]))
+                    print('|'.join(["{x:02d}".format(x=d) for d in grapheme_ids]))
+                    print("orthography_id: " + str(orthography_id))
                 row = zip([orthography_id]*n, grapheme_ids, range(n))
                 values.extend(row)
         cur.executemany(cmd_insert, values)
@@ -510,7 +512,7 @@ def grapheme_representation(conn, alphabet, phonmap, verbose=False):
             r = cur.fetchone()
             if r is None:
                 if verbose:
-                    print "Adding grapheme `"+grapheme+"` to database."
+                    print("Adding grapheme `"+grapheme+"` to database.")
                 graphemes(conn, grapheme)
                 cur.execute(cmd_select_grapheme_id, {'grapheme': grapheme})
                 r = cur.fetchone()
@@ -678,31 +680,31 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[], ndif
         cur.execute(cmd_select_dialect_id, {'dialect': dialect_root})
         r = cur.fetchone()
         if r is None:
-            print "Error: {} is not a recognized dialect label (dialect_root).".format(dialect_root)
+            print("Error: {} is not a recognized dialect label (dialect_root).".format(dialect_root))
         dialect_root_id = r['id']
 
         cur.execute(cmd_select_dialect_id, {'dialect': dialect_alt})
         r = cur.fetchone()
         if r is None:
-            print "Error: {} is not a recognized dialect label (dialect_alt).".format(dialect_alt)
+            print("Error: {} is not a recognized dialect label (dialect_alt).".format(dialect_alt))
         dialect_alt_id = r['id']
 
         cur.execute(cmd_select_corpus_id, {'corpus': corpus})
         r = cur.fetchone()
         if r is None:
-            print "Error: {} is not a recognized corpus label.".format(corpus)
+            print("Error: {} is not a recognized corpus label.".format(corpus))
         corpus_id = r['id']
 
         cur.execute(cmd_select_accent_id, {'accent': accent})
         r = cur.fetchone()
         if r is None:
-            print "Error: {} is not a recognized accent label.".format(corpus)
+            print("Error: {} is not a recognized accent label.".format(corpus))
         accent_id = r['id']
 
         cur.execute(cmd_select_alphabet_id, {'alphabet': alphabet})
         r = cur.fetchone()
         if r is None:
-            print "Error: {} is not a recognized alphabet label.".format(corpus)
+            print("Error: {} is not a recognized alphabet label.".format(corpus))
         alphabet_id = r['id']
 
     if not GIVEN_SAMPLE:
@@ -745,7 +747,7 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[], ndif
 
     with conn:
         cur = conn.cursor()
-        print dialect_root_id,dialect_alt_id,accent_id,alphabet_id,corpus_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff_samp,1.0,int(use_frequency)
+        print(dialect_root_id,dialect_alt_id,accent_id,alphabet_id,corpus_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff_samp,1.0,int(use_frequency))
         cur.execute(cmd_insert_sample, (dialect_root_id,dialect_alt_id,accent_id,alphabet_id,corpus_id,n,nhomo_root_samp,nhomowords_root_samp,nhomo_alt_samp,nhomowords_alt_samp,ndiff_samp,1.0,int(use_frequency)))
         cur.execute("SELECT id FROM sample WHERE rowid=:rowid;", {'rowid': cur.lastrowid})
         r = cur.fetchone()

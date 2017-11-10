@@ -1,3 +1,4 @@
+from __future__ import absolute_import, division, print_function
 import operator
 import copy
 def dialect_id(conn, dialect):

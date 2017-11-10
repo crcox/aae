@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import absolute_import, division, print_function
 import argparse
 import os
 import pkg_resources
@@ -123,7 +124,7 @@ SAMPLE = aae.utils.prune_representations(SAMPLE)
 if 'warmstart' in NETINFO and NETINFO['warmstart']:
     WarmCfg = NETINFO['warmstart']
     if all(True if k in WarmCfg.keys() else False for k in ['knn','ratio']):
-        print "knn and ratio cannot both be specified."
+        print("knn and ratio cannot both be specified.")
         raise ValueError
     DIST = lensapi.examples.stimdist(SAMPLE,WarmCfg['type'],method=WarmCfg['distmethod'])
     try:

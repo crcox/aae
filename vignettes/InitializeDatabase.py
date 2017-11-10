@@ -1,9 +1,11 @@
 #!/usr/bin/env python
+from __future__ import absolute_import, division, print_function
 import os,json,pickle,sys
 import sqlite3
 import string
-import aae
-import aae.sql
+import aae.parse
+import aae.sql.insert
+import aae.sql.select
 from aae.accents import standard as PHON_MAP
 from aae.semantics import standard_3k as SEM_MAP
 
@@ -93,7 +95,7 @@ aae.sql.insert.childsample(conn, sample_id, 0.50)
 # is the sample id, and all examples contained in the sample will be associated
 # with this id.
 for i in range(100):
-    print i
+    print(i)
     sample_id = aae.sql.insert.sample(conn,
         corpus="3k",
         dialect_root="SAE",
