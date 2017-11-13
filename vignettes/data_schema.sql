@@ -199,6 +199,7 @@ CREATE TABLE "sample" (
   "p_rule_applied" double DEFAULT NULL,
   "use_frequency" INTEGER NOT NULL,
   "child_of" INTEGER DEFAULT NULL,
+  "source" TEXT DEFAULT NULL,
   PRIMARY KEY ("id")
   CONSTRAINT "fk_sample_dialect1" FOREIGN KEY ("dialect_root_id", "dialect_alt_id") REFERENCES "dialect" ("id", "id") ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT "fk_sample_accent1" FOREIGN KEY ("accent_id") REFERENCES "accent" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION

@@ -80,7 +80,8 @@ sample_id = aae.sql.insert.sample(conn,
     dialect_alt="AAE",
     accent="standard",
     alphabet="orthogonal",
-    list_stim=stimlist)
+    list_stim=stimlist,
+    list_label="original_stimlist_500_250.txt")
 
 # A child sample inherits everything from the parent, but with rules for
 # obtaining alternate pronunciations applied only a specified proportion of the
@@ -94,7 +95,7 @@ aae.sql.insert.childsample(conn, sample_id, 0.50)
 # will be inserted directly into the database. The return value of the function
 # is the sample id, and all examples contained in the sample will be associated
 # with this id.
-for i in range(100):
+for i in range(10):
     print(i)
     sample_id = aae.sql.insert.sample(conn,
         corpus="3k",
