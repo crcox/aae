@@ -19,12 +19,19 @@ proc summarizeError {errorSerial {threshold 0}} {
       }
     }
   }
-  set anyErr [lmap c $errCounts {expr $c > 0}]
-  set allErr [lmap c $errCounts {expr $c == $m}]
-  foreach any $anyErr all $allErr {
+  foreach c $errCounts {
+    set any [expr $c > 0]
+    set all [expr $c == $m]
     incr errorSummary(any) $any
     incr errorSummary(all) $all
   }
+  # Incompatible with Tcl/Tk 8.5
+  # set anyErr [lmap c $errCounts {expr $c > 0}]
+  # set allErr [lmap c $errCounts {expr $c == $m}]
+  # foreach any $anyErr all $allErr {
+  #   incr errorSummary(any) $any
+  #   incr errorSummary(all) $all
+  # }
   foreach {group err} [array get errorSummary] {
     lappend errorSummary($group) [expr $err / double($nExample)]
     puts [format "%12s: %d (%.3f)" $group $err [expr $err / double($nExample)]]
