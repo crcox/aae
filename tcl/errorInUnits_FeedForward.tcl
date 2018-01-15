@@ -56,7 +56,7 @@ proc errorInUnits {fhandle {groups 0}} {
         # NB: In continuous net, tick 0 is a setup tick.
         # Tick 1 is the first that reflects ecample file.
         set actPos [expr ($lastTick + $startPos) % $mTick]
-        set target [getObj $GROUP.unit(1).targetHistory($actPos)]
+        set target [getObj $GROUP.unit(1).target]
         if { $target=="-" } {
           continue
         }
@@ -67,8 +67,8 @@ proc errorInUnits {fhandle {groups 0}} {
         set correctrejections 0
         set errors 0
         for {set iUnit 0} {$iUnit < $nUnit} {incr iUnit} {
-          set target [getObj $GROUP.unit($iUnit).targetHistory($actPos)]
-          set output [getObj $GROUP.unit($iUnit).outputHistory($actPos)]
+          set target [getObj $GROUP.unit($iUnit).target]
+          set output [getObj $GROUP.unit($iUnit).output]
           set diff [expr {$target - $output}]
           set err [expr abs($diff)]
 #          set cumerr [expr {$cumerr + $err}]

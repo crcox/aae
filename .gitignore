@@ -114,3 +114,5 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+vignettes/sqlite.properties
