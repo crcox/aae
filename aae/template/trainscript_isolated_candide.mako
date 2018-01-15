@@ -80,8 +80,10 @@ proc main {} {
 
   loadExamples [file join "ex" "train.ex"] -exmode PERMUTED
   useTrainingSet train
+  set numTrainingExamples [getObj trainingSet.numExamples]
   loadExamples [file join "ex" "test.ex"] -exmode ORDERED
   useTestingSet test
+  set numTestingExamples [getObj testingSet.numExamples]
   set errlog [open [file join "error.log"] w]
   set MFHCcsv [open [file join "MFHC.csv"] w]
   set errList [errorInUnits $MFHCcsv {${' '.join(OutputLayers)}}]
@@ -90,40 +92,31 @@ proc main {} {
   set errHistory [list]
   set i 0
   while {$PError <%text>></%text> $ErrorCriterion} {
-    train -a steepest
-    set err [getObj error]
-    if { [llength $errHistory] == 10 } {
-      set spike [detectSpike $errHistory $err $SpikeThreshold]
-      if { $spike } {
-        # Revert to the prior weight state and half the learning rate.
-        puts "Spike!"
-        loadWeights "oneBack.wt"
-        setObject learningRate [expr {[getObj learningRate] / 2}]
-        set SpikeThreshold [expr {$SpikeThreshold * $SpikeThresholdStepSize}]
-        continue
+    saveWeights "prev.wt"
+    set objective "infinity"
+    for {set i 0} {$i <%text><</%text> $numTrainingExamples } {incr i} {
+      loadWeights "prev.wt"
+      doExample $i -set train -train
+      set returnCode [test $numTestingExamples -return]
+      if { [getObj Test.totalError] <%text><</%text> $objective } {
+        saveWeights "next.wt"
+        set objective [getObj Test.totalError]
       }
     }
-    # Update and maintain the (cross-entropy) error history.
-    lappend errHistory $err
-    if {[llength $errHistory] <%text>></%text> 10} {
-      set errHistory [lrange $errHistory 1 end]
-    }
+    loadWeights "next.wt"
 
     # Log the (cross-entropy) error.
-    puts $errlog [format "%.2f" $err]
+    puts $errlog [format "%.2f" [getObj Test.totalError]]
 
     # Save the model weights. Periodically save to a persistent archive.
-    saveWeights "oneBack.wt"
     incr i 1
     if { [expr {$i % $TestEpoch}] == 0 } {
       # Compute the (unit-wise) error
       set errList [errorInUnits $MFHCcsv {${' '.join(OutputLayers)}}]
       set PError [summarizeError $errList 0]
       set wtfile [file join $WeightDir [format "%d.wt" [getObj totalUpdates]]]
-      file copy "oneBack.wt" $wtfile
     }
   }
-  file delete "oneBack.wt"
   saveWeights "final.wt"
   close $errlog
   close $MFHCcsv
