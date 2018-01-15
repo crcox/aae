@@ -1,13 +1,17 @@
 <%
-  name = NetInfo['NetworkArchitecture']
-  intervals = NetInfo['intervals']
-  ticksPerInterval = NetInfo['ticksPerInterval']
-  netType = NetInfo['NetworkType']
-  layers = NetInfo['layers']
-  connections = NetInfo['connections']
+    if NetInfo['NetworkType'].upper() == 'FEEDFORWARD':
+        addNet_cmd = "addNet {name:s}".format(name=NetInfo['NetworkArchitecture'])
+    else:
+        addNet_cmd = "addNet {name:s} -i {intervals:d} -t {ticksPerInterval:d} {netType:s}".format(
+            name=NetInfo['NetworkArchitecture'],
+            intervals=NetInfo['intervals'],
+            ticksPerInterval=NetInfo['ticksPerInterval'],
+            netType=NetInfo['NetworkType'])
+        
+    layers = NetInfo['layers']
+    connections = NetInfo['connections']
 %>
-
-addNet ${name} -i ${intervals} -t ${ticksPerInterval} ${netType}
+${addNet_cmd}
 
 % for GROUP in layers:
 ${add_group(GROUP)}
