@@ -52,6 +52,10 @@ proc errorInUnits {fhandle {groups 0}} {
         set mTick [getObj historyLength]
         set startPos [getObj exampleHistoryStart]
 
+        # Ticks without targets can be skipped.
+        # NB: In continuous net, tick 0 is a setup tick.
+        # Tick 1 is the first that reflects ecample file.
+        set actPos [expr ($lastTick + $startPos) % $mTick]
         set target [getObj $GROUP.unit(1).target]
         if { $target=="-" } {
           continue
