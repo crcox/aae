@@ -98,15 +98,15 @@ proc main {} {
       loadWeights "prev.wt"
       doExample $i -set train -train
       set returnCode [test $numTestingExamples -return]
-      if { [getObj Test.totalError] <%text><</%text> $objective } {
+      if { $Test(totalError) <%text><</%text> $objective } {
         saveWeights "next.wt"
-        set objective [getObj Test.totalError]
+        set objective $Test(totalError)
       }
     }
     loadWeights "next.wt"
 
     # Log the (cross-entropy) error.
-    puts $errlog [format "%.2f" [getObj Test.totalError]]
+    puts $errlog [format "%.2f" $Test(totalError)]
 
     # Save the model weights. Periodically save to a persistent archive.
     incr i 1
