@@ -34,6 +34,7 @@ p.add_argument('-d','--dialect',type=str,nargs='+',default=[])
 p.add_argument('-a','--accent',type=str,nargs='+',default=[])
 p.add_argument('-o','--output',type=str,default='train.ex')
 p.add_argument('-s','--sample_id',type=str,default=None)
+p.add_argument('-S','--sequential',action="store_true")
 p.add_argument('-t','--test_sample_id',type=str,default=None)
 args = p.parse_args()
 
@@ -56,12 +57,16 @@ elif 'database' in CONFIG:
 else:
     DATABASE = pkg_resources.resource_filename(resource_package,'database/initial.db')
 
+SEQUENTIAL = args.sequential
+
 DIALECT_SUBSET = []
 if args.dialect:
     DIALECT_SUBSET = args.dialect
 else:
-    if CONFIG['TrainingMethod'] in ['AAE','SAE','reading_AAE','reading_SAE']:
-        DIALECT_SUBSET = CONFIG['TrainingMethod']
+    if 'AAE' in CONFIG['TrainingMethod']:
+        DIALECT_SUBSET = 'AAE'
+    elif 'SAE' in CONFIG['TrainingMethod']:
+        DIALECT_SUBSET = 'SAE'
 
 ACCENT_ID = []
 if args.accent:
@@ -77,7 +82,7 @@ trainscript_template_filename = "trainscript_{x:s}.mako".format(x=CONFIG['Traini
 
 resource_path_trainscript = os.path.join('template',trainscript_template_filename)
 trainscript_template_string = pkg_resources.resource_string(resource_package, resource_path_trainscript)
-if trainscript_template_string == 'trainscript_isolated.mako':
+if trainscript_template_string in [ 'trainscript_isolated.mako', 'trainscript_isolated_generalize.mako', 'trainscript_isolated_sequential.mako', 'trainscript_isolated_candide.mako']:
     trainscript_template_filename = trainscript_template_string
     resource_path_trainscript = os.path.join('template',trainscript_template_filename)
     trainscript_template_string = pkg_resources.resource_string(resource_package, resource_path_trainscript)
@@ -182,7 +187,11 @@ with open(EX_FILENAME,'w') as f:
 
         for eventLabel, events in NETINFO['events'].items():
             # Loop over words and build/write examples
-            Words = sorted(Dialect.keys())
+            if SORT_EXAMPLES_ALPHABETICALLY:
+                Words = sorted(Dialect.keys())
+            else:
+                Words = Dialect.keys()
+
             for word in Words:
                 EXAMPLE = Dialect[word]
                 name = '{w}_{t}_{k}'.format(w=word,t=eventLabel,k=dialectLabel)
