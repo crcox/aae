@@ -232,7 +232,8 @@ CREATE TABLE "sample_has_example" (
   "phonology_id" INTEGER NOT NULL,
   "orthography_id" INTEGER NOT NULL,
   "dialect_id" INTEGER NOT NULL,
-  PRIMARY KEY ("sample_id", "word_id", "dialect_id")
+  "sequence" INTEGER,
+  --PRIMARY KEY ("sample_id", "word_id", "dialect_id")
   CONSTRAINT "fk_sample_has_example_sample1" FOREIGN KEY ("sample_id") REFERENCES "sample" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION,
   CONSTRAINT "fk_sample_has_example_word1" FOREIGN KEY ("word_id") REFERENCES "word" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
   CONSTRAINT "fk_sample_has_example_phonology1" FOREIGN KEY ("phonology_id") REFERENCES "phonology" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION
