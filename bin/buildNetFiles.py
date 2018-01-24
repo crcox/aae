@@ -9,6 +9,8 @@ import yaml
 import aae.sql.select
 import aae.utils
 import lensapi.examples
+import shutil
+import os
 from mako.template import Template
 # Reminders about Lens example files:
 # - Files begin with a header that sets defaults.
@@ -32,22 +34,27 @@ p.add_argument('-d','--dialect',type=str,nargs='+',default=[])
 p.add_argument('-a','--accent',type=str,nargs='+',default=[])
 p.add_argument('-o','--output',type=str,default='train.ex')
 p.add_argument('-s','--sample_id',type=str,default=None)
+p.add_argument('-t','--test_sample_id',type=str,default=None)
 args = p.parse_args()
-
-if args.database:
-    DATABASE = args.database
-else:
-    DATABASE = pkg_resources.resource_filename(resource_package,'database/initial.db')
 
 PATH_TO_JSON = args.config
 OUTDIR = os.path.dirname(PATH_TO_JSON)
-EX_FILENAME = os.path.join(OUTDIR,args.output)
+EX_DIR = os.path.join(OUTDIR, 'ex')
+EX_FILENAME = os.path.join(EX_DIR, args.output)
+TEST_EX_FILENAME = os.path.join(EX_DIR, 'test.ex')
 IN_FILENAME = os.path.join(OUTDIR,'network.in')
 TRAINSCRIPT_FILENAME = os.path.join(OUTDIR,'trainscript.tcl')
 
 # Load instructions
 with open(PATH_TO_JSON,'r') as f:
     CONFIG = json.load(f)
+
+if args.database:
+    DATABASE = args.database
+elif 'database' in CONFIG:
+    DATABASE = CONFIG['database']
+else:
+    DATABASE = pkg_resources.resource_filename(resource_package,'database/initial.db')
 
 DIALECT_SUBSET = []
 if args.dialect:
@@ -70,6 +77,11 @@ trainscript_template_filename = "trainscript_{x:s}.mako".format(x=CONFIG['Traini
 
 resource_path_trainscript = os.path.join('template',trainscript_template_filename)
 trainscript_template_string = pkg_resources.resource_string(resource_package, resource_path_trainscript)
+if trainscript_template_string == 'trainscript_isolated.mako':
+    trainscript_template_filename = trainscript_template_string
+    resource_path_trainscript = os.path.join('template',trainscript_template_filename)
+    trainscript_template_string = pkg_resources.resource_string(resource_package, resource_path_trainscript)
+
 trainscript_template = Template(trainscript_template_string)
 
 if 'warmstart' in CONFIG and CONFIG['warmstart']:
@@ -88,6 +100,13 @@ if args.sample_id:
     SAMPLE_ID = args.sample_id
 else:
     SAMPLE_ID = CONFIG['sample_id']
+
+if args.sample_id:
+    TEST_SAMPLE_ID = args.test_sample_id
+elif 'test_sample_id' in CONFIG:
+    TEST_SAMPLE_ID = CONFIG['test_sample_id']
+else:
+    TEST_SAMPLE_ID=SAMPLE_ID
 
 FLAG_CONTEXT = CONFIG['context']
 
@@ -111,6 +130,8 @@ TSET = sorted(list(set(_tmp_list)))
 conn = sqlite3.connect(DATABASE)
 conn.row_factory = sqlite3.Row
 SAMPLE = aae.sql.select.sample(conn, SAMPLE_ID, ACCENT_ID)
+if not TEST_SAMPLE_ID == SAMPLE_ID:
+    TESTSAMPLE = aae.sql.select.sample(conn, TEST_SAMPLE_ID, ACCENT_ID)
 conn.close()
 
 if DIALECT_SUBSET:
@@ -118,7 +139,16 @@ if DIALECT_SUBSET:
             for dialectLabel,dialectExamples in SAMPLE.items()
             if dialectLabel in DIALECT_SUBSET)
 
-SAMPLE = aae.utils.prune_representations(SAMPLE)
+    if not TEST_SAMPLE_ID == SAMPLE_ID:
+        TESTSAMPLE = dict((dialectLabel, dialectExamples)
+                for dialectLabel,dialectExamples in TESTSAMPLE.items()
+                if dialectLabel in DIALECT_SUBSET)
+
+if TEST_SAMPLE_ID == SAMPLE_ID:
+    SAMPLE = aae.utils.prune_representations(SAMPLE)
+    TESTSAMPLE = SAMPLE
+else:
+    SAMPLE,TESTSAMPLE = aae.utils.prune_representations([SAMPLE,TESTSAMPLE])
 
 # Add "warmstart" data into the SAMPLE structures.
 if 'warmstart' in NETINFO and NETINFO['warmstart']:
@@ -132,7 +162,16 @@ if 'warmstart' in NETINFO and NETINFO['warmstart']:
     except KeyError:
         SAMPLE = lensapi.examples.warmstart(SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
 
+    if not TEST_SAMPLE_ID == SAMPLE_ID:
+        try:
+            TESTSAMPLE = lensapi.examples.warmstart(TESTSAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],knn=WarmCfg['knn'])
+        except KeyError:
+            TESTSAMPLE = lensapi.examples.warmstart(TESTSAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
+
 # Build and write representations
+if not os.path.isdir(EX_DIR):
+    os.mkdir(EX_DIR)
+
 with open(EX_FILENAME,'w') as f:
     lensapi.examples.writeheader(f, NETINFO['header'])
     for dialectLabel, Dialect in SAMPLE.items():
@@ -154,6 +193,31 @@ with open(EX_FILENAME,'w') as f:
                 else:
                     freq = 1 # everything equally probable
                 lensapi.examples.writeex(f,name,freq,inputs,targets)
+
+if TEST_SAMPLE_ID == SAMPLE_ID:
+    shutil.copyfile(EX_FILENAME,TEST_EX_FILENAME)
+else:
+    with open(TEST_EX_FILENAME,'w') as f:
+        lensapi.examples.writeheader(f, NETINFO['header'])
+        for dialectLabel, Dialect in TESTSAMPLE.items():
+            if FLAG_CONTEXT:
+                context = dialectLabel
+            else:
+                context = None
+
+            for eventLabel, events in NETINFO['events'].items():
+                # Loop over words and build/write examples
+                Words = sorted(Dialect.keys())
+                for word in Words:
+                    EXAMPLE = Dialect[word]
+                    name = '{w}_{t}_{k}'.format(w=word,t=eventLabel,k=dialectLabel)
+                    inputs = lensapi.examples.buildinput(EXAMPLE,events,NETINFO['input'],context,ISET)
+                    targets = lensapi.examples.buildtarget(EXAMPLE,events,NETINFO['target'],context,TSET)
+                    if CONFIG['frequency']:
+                        freq = CONFIG['frequency']
+                    else:
+                        freq = 1 # everything equally probable
+                    lensapi.examples.writeex(f,name,freq,inputs,targets)
 
 if CONFIG['TrainingMethod'].lower() == 'blocked':
     for dialectLabel, Dialect in SAMPLE.items():
