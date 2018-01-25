@@ -187,14 +187,13 @@ with open(EX_FILENAME,'w') as f:
 
         for eventLabel, events in NETINFO['events'].items():
             # Loop over words and build/write examples
-            if SORT_EXAMPLES_ALPHABETICALLY:
-                Words = sorted(Dialect.keys())
-            else:
-                Words = Dialect.keys()
+            # if SORT_EXAMPLES_ALPHABETICALLY:
+            #     Words = sorted(Dialect.keys())
+            # else:
+            #     Words = Dialect.keys()
 
-            for word in Words:
-                EXAMPLE = Dialect[word]
-                name = '{w}_{t}_{k}'.format(w=word,t=eventLabel,k=dialectLabel)
+            for EXAMPLE in Dialect:
+                name = '{w}_{t}_{k}'.format(w=EXAMPLE['word'],t=eventLabel,k=dialectLabel)
                 inputs = lensapi.examples.buildinput(EXAMPLE,events,NETINFO['input'],context,ISET)
                 targets = lensapi.examples.buildtarget(EXAMPLE,events,NETINFO['target'],context,TSET)
                 if CONFIG['frequency']:
@@ -216,10 +215,9 @@ else:
 
             for eventLabel, events in NETINFO['events'].items():
                 # Loop over words and build/write examples
-                Words = sorted(Dialect.keys())
-                for word in Words:
-                    EXAMPLE = Dialect[word]
-                    name = '{w}_{t}_{k}'.format(w=word,t=eventLabel,k=dialectLabel)
+                # Words = sorted(Dialect.keys())
+                for EXAMPLE in Dialect:
+                    name = '{w}_{t}_{k}'.format(w=EXAMPLE['word'],t=eventLabel,k=dialectLabel)
                     inputs = lensapi.examples.buildinput(EXAMPLE,events,NETINFO['input'],context,ISET)
                     targets = lensapi.examples.buildtarget(EXAMPLE,events,NETINFO['target'],context,TSET)
                     if CONFIG['frequency']:
@@ -239,10 +237,9 @@ if CONFIG['TrainingMethod'].lower() == 'blocked':
 
             for eventLabel, events in NETINFO['events'].items():
                 # Loop over words and build/write examples
-                Words = sorted(Dialect.keys())
-                for word in Words:
-                    EXAMPLE = Dialect[word]
-                    name = '{w}_{t}_{k}'.format(w=word,t=eventLabel,k=dialectLabel)
+                # Words = sorted(Dialect.keys())
+                for EXAMPLE in Dialect:
+                    name = '{w}_{t}_{k}'.format(w=EXAMPLE['word'],t=eventLabel,k=dialectLabel)
                     inputs = lensapi.examples.buildinput(EXAMPLE,events,NETINFO['input'],context,ISET)
                     targets = lensapi.examples.buildtarget(EXAMPLE,events,NETINFO['target'],context,TSET)
                     if CONFIG['frequency']:

@@ -143,17 +143,23 @@ def sample(conn, sample_id, accent_id=None):
         cur.execute(cmd_select_example_data, {"sample_id": sample_id})
         SAMPLE_TBL = cur.fetchall()
         for R in SAMPLE_TBL:
-            dialect = R['dialect']
-            word = R['word']
+# DICT
+#            dialect = R['dialect']
+#            word = R['word']
+#            if not dialect in sample:
+#                sample[dialect] = {}
+#            if not word in sample[dialect]:
+#                sample[dialect][word] = {}
+# LIST
+            if not R['dialect'] in sample:
+                sample[R['dialect']] = []
 
-            if not dialect in sample:
-                sample[dialect] = {}
-            if not word in sample[dialect]:
-                sample[dialect][word] = {}
-
-            sample[dialect][word]["freq"] = R['frequency']
-            sample[dialect][word]["orth_code"] = R['orthcode']
-            sample[dialect][word]["phon_code"] = R['phoncode']
+            RDICT = {}
+            RDICT['dialect'] = R['dialect']
+            RDICT['word'] = R['word']
+            RDICT['freq'] = R['frequency']
+            RDICT['orth_code'] = R['orthcode']
+            RDICT['phon_code'] = R['phoncode']
 
             WHERE = {'sample_id': sample_id, 'word_id':R['word_id'], 'dialect_id': R['dialect_id'], 'orthography_id': R['orthography_id'], 'alphabet_id': alphabet_id}
             cur.execute(cmd_select_orthography_representation, WHERE)
@@ -165,7 +171,7 @@ def sample(conn, sample_id, accent_id=None):
                     for i in range(len(x),r['grapheme_unit']+1):
                         x.append([])
                     x[r['grapheme_unit']].append(r['orthrep_value'])
-            sample[dialect][word]["orth"] = x
+            RDICT['orth'] = x
 
             WHERE = {'sample_id': sample_id, 'word_id':R['word_id'], 'dialect_id': R['dialect_id'], 'phonology_id': R['phonology_id'], 'accent_id': accent_id}
             cur.execute(cmd_select_phonology_representation, WHERE)
@@ -177,10 +183,11 @@ def sample(conn, sample_id, accent_id=None):
                     for i in range(len(x),r['phoneme_unit']+1):
                         x.append([])
                     x[r['phoneme_unit']].append(r['phonrep_value'])
-            sample[dialect][word]["phon"] = x
+            RDICT['phon'] = x
 
             WHERE = {'sample_id': sample_id, 'dialect_id':R['dialect_id'], 'word_id': R['word_id']}
             cur.execute(cmd_select_semantic_representation, WHERE)
-            sample[dialect][word]["sem"] = [r['semrep_value'] for r in cur.fetchall()]
+            RDICT['sem'] = [r['semrep_value'] for r in cur.fetchall()]
+            sample[R['dialect']].append(dict(RDICT))
 
     return sample
