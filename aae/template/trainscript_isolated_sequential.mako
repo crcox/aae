@@ -10,6 +10,7 @@
   SpikeThresholdStepSize = CONFIG['SpikeThresholdStepSize']
   TestEpoch = CONFIG['TestEpoch']
   ErrorCriterion = CONFIG['ErrorCriterion']
+  MaxIter = CONFIG['MaxIter']
 
   if 'testGroupCrit' in CONFIG:
     testGroupCrit = CONFIG['testGroupCrit']

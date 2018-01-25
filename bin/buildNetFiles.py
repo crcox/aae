@@ -11,6 +11,9 @@ import aae.utils
 import lensapi.examples
 import shutil
 import os
+import os.path
+import timeit
+import pickle
 from mako.template import Template
 # Reminders about Lens example files:
 # - Files begin with a header that sets defaults.
@@ -38,6 +41,7 @@ p.add_argument('-S','--sequential',action="store_true")
 p.add_argument('-t','--test_sample_id',type=str,default=None)
 args = p.parse_args()
 
+CACHE_SAMPLE = True
 PATH_TO_JSON = args.config
 OUTDIR = os.path.dirname(PATH_TO_JSON)
 EX_DIR = os.path.join(OUTDIR, 'ex')
@@ -56,6 +60,8 @@ elif 'database' in CONFIG:
     DATABASE = CONFIG['database']
 else:
     DATABASE = pkg_resources.resource_filename(resource_package,'database/initial.db')
+
+dbname = os.path.basename(DATABASE)
 
 SEQUENTIAL = args.sequential
 
@@ -82,12 +88,13 @@ trainscript_template_filename = "trainscript_{x:s}.mako".format(x=CONFIG['Traini
 
 resource_path_trainscript = os.path.join('template',trainscript_template_filename)
 trainscript_template_string = pkg_resources.resource_string(resource_package, resource_path_trainscript)
-if trainscript_template_string in [ 'trainscript_isolated.mako', 'trainscript_isolated_generalize.mako', 'trainscript_isolated_sequential.mako', 'trainscript_isolated_candide.mako']:
-    trainscript_template_filename = trainscript_template_string
+if str(trainscript_template_string.strip(),'utf-8') in [ 'trainscript_isolated.mako', 'trainscript_isolated_generalize.mako', 'trainscript_isolated_sequential.mako', 'trainscript_isolated_candide.mako']:
+    trainscript_template_filename = str(trainscript_template_string.strip(),'utf-8')
     resource_path_trainscript = os.path.join('template',trainscript_template_filename)
     trainscript_template_string = pkg_resources.resource_string(resource_package, resource_path_trainscript)
 
 trainscript_template = Template(trainscript_template_string)
+
 
 if 'warmstart' in CONFIG and CONFIG['warmstart']:
     # NetInfoFile = 'network/{s:s}_warmstart.yaml'.format(s=CONFIG['NetworkArchitecture'])
@@ -132,51 +139,97 @@ for value in NETINFO['target'].values():
 TSET = sorted(list(set(_tmp_list)))
 
 # Load sample data
-conn = sqlite3.connect(DATABASE)
-conn.row_factory = sqlite3.Row
-SAMPLE = aae.sql.select.sample(conn, SAMPLE_ID, ACCENT_ID)
-if not TEST_SAMPLE_ID == SAMPLE_ID:
-    TESTSAMPLE = aae.sql.select.sample(conn, TEST_SAMPLE_ID, ACCENT_ID)
-conn.close()
+start = timeit.default_timer()
+SAMPLE_READ_FROM_CACHE = False
+TEST_SAMPLE_READ_FROM_CACHE = False
+if CACHE_SAMPLE:
+    dbpath = os.path.dirname(DATABASE)
+    cached_sample_filename = "{dbpath:s}/{dbname:s}_sampleID-{sampleID:04d}.pkl".format(dbpath=dbpath,dbname=dbname, sampleID=SAMPLE_ID)
+    if os.path.isfile(cached_sample_filename):
+        with open(cached_sample_filename,'rb') as f:
+            SAMPLE = pickle.load(f)
+        SAMPLE_READ_FROM_CACHE = True
 
-if DIALECT_SUBSET:
-    SAMPLE = dict((dialectLabel, dialectExamples)
-            for dialectLabel,dialectExamples in SAMPLE.items()
-            if dialectLabel in DIALECT_SUBSET)
+    cached_sample_filename = "{dbpath:s}/{dbname:s}_sampleID-{sampleID:04d}.pkl".format(dbpath=dbpath,dbname=dbname, sampleID=TEST_SAMPLE_ID)
+    if os.path.isfile(cached_sample_filename):
+        with open(cached_sample_filename,'rb') as f:
+            TEST_SAMPLE = pickle.load(f)
+        TEST_SAMPLE_READ_FROM_CACHE = True
 
+if not SAMPLE_READ_FROM_CACHE or not TEST_SAMPLE_READ_FROM_CACHE:
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+
+    if not SAMPLE_READ_FROM_CACHE:
+        SAMPLE = aae.sql.select.sample(conn, SAMPLE_ID, ACCENT_ID)
     if not TEST_SAMPLE_ID == SAMPLE_ID:
-        TESTSAMPLE = dict((dialectLabel, dialectExamples)
-                for dialectLabel,dialectExamples in TESTSAMPLE.items()
-                if dialectLabel in DIALECT_SUBSET)
+        if not TEST_SAMPLE_READ_FROM_CACHE:
+            TEST_SAMPLE = aae.sql.select.sample(conn, TEST_SAMPLE_ID, ACCENT_ID)
 
-if TEST_SAMPLE_ID == SAMPLE_ID:
-    SAMPLE = aae.utils.prune_representations(SAMPLE)
-    TESTSAMPLE = SAMPLE
-else:
-    SAMPLE,TESTSAMPLE = aae.utils.prune_representations([SAMPLE,TESTSAMPLE])
+    conn.close()
 
-# Add "warmstart" data into the SAMPLE structures.
-if 'warmstart' in NETINFO and NETINFO['warmstart']:
-    WarmCfg = NETINFO['warmstart']
-    if all(True if k in WarmCfg.keys() else False for k in ['knn','ratio']):
-        print("knn and ratio cannot both be specified.")
-        raise ValueError
-    DIST = lensapi.examples.stimdist(SAMPLE,WarmCfg['type'],method=WarmCfg['distmethod'])
-    try:
-        SAMPLE = lensapi.examples.warmstart(SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],knn=WarmCfg['knn'])
-    except KeyError:
-        SAMPLE = lensapi.examples.warmstart(SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
+    if DIALECT_SUBSET:
+        if not SAMPLE_READ_FROM_CACHE:
+            SAMPLE = dict((dialectLabel, dialectExamples)
+                    for dialectLabel,dialectExamples in SAMPLE.items()
+                    if dialectLabel in DIALECT_SUBSET)
 
-    if not TEST_SAMPLE_ID == SAMPLE_ID:
-        try:
-            TESTSAMPLE = lensapi.examples.warmstart(TESTSAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],knn=WarmCfg['knn'])
-        except KeyError:
-            TESTSAMPLE = lensapi.examples.warmstart(TESTSAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
+        if not TEST_SAMPLE_ID == SAMPLE_ID:
+            if not TEST_SAMPLE_READ_FROM_CACHE:
+                TEST_SAMPLE = dict((dialectLabel, dialectExamples)
+                        for dialectLabel,dialectExamples in TEST_SAMPLE.items()
+                        if dialectLabel in DIALECT_SUBSET)
+
+    if TEST_SAMPLE_ID == SAMPLE_ID:
+        if not SAMPLE_READ_FROM_CACHE:
+            SAMPLE = aae.utils.prune_representations(SAMPLE)
+        TEST_SAMPLE = SAMPLE
+    else:
+        if not SAMPLE_READ_FROM_CACHE or not TEST_SAMPLE_READ_FROM_CACHE:
+            SAMPLE,TEST_SAMPLE = aae.utils.prune_representations([SAMPLE,TEST_SAMPLE])
+
+    # Add "warmstart" data into the SAMPLE structures.
+    if 'warmstart' in NETINFO and NETINFO['warmstart']:
+        WarmCfg = NETINFO['warmstart']
+        if all(True if k in WarmCfg.keys() else False for k in ['knn','ratio']):
+            print("knn and ratio cannot both be specified.")
+            raise ValueError
+        if not SAMPLE_READ_FROM_CACHE:
+            DIST = lensapi.examples.stimdist(SAMPLE,WarmCfg['type'],method=WarmCfg['distmethod'])
+            try:
+                SAMPLE = lensapi.examples.warmstart(SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],knn=WarmCfg['knn'])
+            except KeyError:
+                SAMPLE = lensapi.examples.warmstart(SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
+
+        if not TEST_SAMPLE_ID == SAMPLE_ID:
+            if not TEST_SAMPLE_READ_FROM_CACHE:
+                DIST = lensapi.examples.stimdist(TEST_SAMPLE,WarmCfg['type'],method=WarmCfg['distmethod'])
+                try:
+                    TEST_SAMPLE = lensapi.examples.warmstart(TEST_SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],knn=WarmCfg['knn'])
+                except KeyError:
+                    TEST_SAMPLE = lensapi.examples.warmstart(TEST_SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
+
+if CACHE_SAMPLE and not SAMPLE_READ_FROM_CACHE:
+    dbpath = os.path.dirname(DATABASE)
+    cached_sample_filename = "{dbpath:s}/{dbname:s}_sampleID-{sampleID:04d}.pkl".format(dbpath=dbpath,dbname=dbname, sampleID=SAMPLE_ID)
+    if not os.path.isfile(cached_sample_filename):
+        with open(cached_sample_filename, 'wb') as f:
+            pickle.dump(SAMPLE, f)
+
+if CACHE_SAMPLE and not TEST_SAMPLE_READ_FROM_CACHE:
+    cached_sample_filename = "{dbpath:s}/{dbname:s}_sampleID-{sampleID:04d}.pkl".format(dbpath=dbpath,dbname=dbname, sampleID=TEST_SAMPLE_ID)
+    if not os.path.isfile(cached_sample_filename):
+        with open(cached_sample_filename, 'wb') as f:
+            pickle.dump(TEST_SAMPLE, f)
+
+end = timeit.default_timer()
+print("Time to load and preprocess sample: {elapsed:.3f}".format(elapsed=end - start))
 
 # Build and write representations
 if not os.path.isdir(EX_DIR):
     os.mkdir(EX_DIR)
 
+start = timeit.default_timer()
 with open(EX_FILENAME,'w') as f:
     lensapi.examples.writeheader(f, NETINFO['header'])
     for dialectLabel, Dialect in SAMPLE.items():
@@ -202,12 +255,15 @@ with open(EX_FILENAME,'w') as f:
                     freq = 1 # everything equally probable
                 lensapi.examples.writeex(f,name,freq,inputs,targets)
 
+end = timeit.default_timer()
+print("Time to write training set: {elapsed:.3f}".format(elapsed=end - start))
 if TEST_SAMPLE_ID == SAMPLE_ID:
     shutil.copyfile(EX_FILENAME,TEST_EX_FILENAME)
 else:
+    start = timeit.default_timer()
     with open(TEST_EX_FILENAME,'w') as f:
         lensapi.examples.writeheader(f, NETINFO['header'])
-        for dialectLabel, Dialect in TESTSAMPLE.items():
+        for dialectLabel, Dialect in TEST_SAMPLE.items():
             if FLAG_CONTEXT:
                 context = dialectLabel
             else:
@@ -225,6 +281,9 @@ else:
                     else:
                         freq = 1 # everything equally probable
                     lensapi.examples.writeex(f,name,freq,inputs,targets)
+
+    end = timeit.default_timer()
+    print("Time to write testing set: {elapsed:.3f}".format(elapsed=end - start))
 
 if CONFIG['TrainingMethod'].lower() == 'blocked':
     for dialectLabel, Dialect in SAMPLE.items():
@@ -275,6 +334,13 @@ with open(IN_FILENAME,'w') as f:
     f.write(network_text.strip())
 
 # Write Trainscript
-trainscript_text = trainscript_template.render(CONFIG=CONFIG,NETINFO=NETINFO)
+from mako import exceptions
+
+try:
+    trainscript_text = trainscript_template.render(CONFIG=CONFIG,NETINFO=NETINFO)
+except:
+    with open('Mako_Error.html','wb') as f:
+        f.write(exceptions.html_error_template().render())
+
 with open(TRAINSCRIPT_FILENAME,'w') as f:
-    f.write(trainscript_text.strip())
+    f.write(trainscript_text)
