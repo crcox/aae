@@ -86,10 +86,12 @@ proc main {} {
   set MFHCcsv [open [file join "MFHC.csv"] w]
   set errList [errorInUnits $MFHCcsv {${' '.join(OutputLayers)}}]
   set PError [summarizeError $errList 0]
+  array unset PError_array
+  array set PError_array $PError
   set err [getObj error]
   set errHistory [list]
   set i 0
-  while {$PError <%text>></%text> $ErrorCriterion} {
+  while {[lindex $PError_array(all) 1] <%text>></%text> $ErrorCriterion} {
     train -a steepest
     set err [getObj error]
     if { [llength $errHistory] == 10 } {
@@ -127,6 +129,7 @@ proc main {} {
   saveWeights "final.wt"
   close $errlog
   close $MFHCcsv
+
   exit 0
 }
 

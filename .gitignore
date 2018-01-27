@@ -116,4 +116,6 @@ ENV/
 .mypy_cache/
 
 vignettes/sqlite.properties
-.Rproj.user
+.Rhistory
+*.Rproj
+.Rproj.user/
