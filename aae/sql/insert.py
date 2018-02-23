@@ -669,6 +669,7 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[],
             GIVEN_SAMPLE = list_id
             GIVEN_AS_ID = True
             n = len(GIVEN_SAMPLE)
+            print('using list_id')
         elif list_stim:
             GIVEN_SAMPLE = list_stim
             GIVEN_AS_ID = False
@@ -715,14 +716,17 @@ def sample(conn, corpus, dialect_root, dialect_alt, accent, alphabet, n=[],
     else:
         with conn:
             cur = conn.cursor()
-            for w in list_stim:
-                cur.execute(cmd_select_word_id, {'word': w, 'corpus_id': corpus_id})
-                r = cur.fetchone()
-                try:
-                    word_id = r['id']
-                except:
-                    print(w)
-                    raise
+            for w in GIVEN_SAMPLE:
+                if GIVEN_AS_ID:
+                    word_id = w
+                else:
+                    cur.execute(cmd_select_word_id, {'word': w, 'corpus_id': corpus_id})
+                    r = cur.fetchone()
+                    try:
+                        word_id = r['id']
+                    except:
+                        print(w)
+                        raise
                 cur.execute(cmd_select_phonology, {'dialect': dialect_root_id, 'word': word_id})
                 r = cur.fetchone()
                 phon_id_root = r['phonology_id']

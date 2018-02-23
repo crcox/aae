@@ -55,6 +55,7 @@ elif 'database' in CONFIG:
     DATABASE = CONFIG['database']
 else:
     DATABASE = pkg_resources.resource_filename(resource_package,'database/initial.db')
+print(DATABASE)
 
 DIALECT_SUBSET = []
 if args.dialect:
@@ -101,7 +102,7 @@ if args.sample_id:
 else:
     SAMPLE_ID = CONFIG['sample_id']
 
-if args.sample_id:
+if args.test_sample_id:
     TEST_SAMPLE_ID = args.test_sample_id
 elif 'test_sample_id' in CONFIG:
     TEST_SAMPLE_ID = CONFIG['test_sample_id']
@@ -145,7 +146,7 @@ if DIALECT_SUBSET:
                 if dialectLabel in DIALECT_SUBSET)
 
 if TEST_SAMPLE_ID == SAMPLE_ID:
-    SAMPLE = aae.utils.prune_representations(SAMPLE)
+    SAMPLE, = aae.utils.prune_representations(SAMPLE)
     TESTSAMPLE = SAMPLE
 else:
     SAMPLE,TESTSAMPLE = aae.utils.prune_representations([SAMPLE,TESTSAMPLE])

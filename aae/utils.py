@@ -2,6 +2,8 @@ def prune_representations(SAMPLES):
     phon_UnitUsed = []
     orth_UnitUsed = []
     # Identify which phon units are used
+    if isinstance(SAMPLES,dict):
+        SAMPLES=[SAMPLES]
     for SAMPLE in SAMPLES:
         for dialectLabel, DIALECT in SAMPLE.items():
             for word, EXAMPLE in DIALECT.items():
