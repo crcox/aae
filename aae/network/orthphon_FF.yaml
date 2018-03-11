@@ -1,0 +1,284 @@
+# This yaml-formatted file defines the network architecture for a model that
+# will map Phonology and Orthography with feed-forward weights, with no
+# semantics.
+#
+# The file has been thoroughly commented with the hope that is
+# serves as a template for developing and tweaking future files like it. For a
+# crash course on the yaml format, see the bottom of this file.
+#
+# A general note is that the order of sections within this file are not
+# important from the perspective of the program that will read this file.
+# Everything is referenced by key, not by an ordered index. So if you develop
+# your own files in the future, there is no need to worry about the order of
+# content in this file affecting the proper order of operations, etc.
+
+# TABLE OF CONTENTS
+# =================
+#  1. EXAMPLE FILE HEADER
+#  2. WARM-START SPECIFICATIONS
+#  3. INPUT AND TARGET KEYS
+#  4. EXAMPLE EVENT DESCRIPTIONS
+#  5. LAYER DEFINITIONS
+#  6. CONNECTION DEFINITIONS
+#  7. YAML DESCRIPTION
+
+# NETWORK FILE HEADER
+# ===================
+# These simply correspond to the to the addNet LENS command arguments.
+# They control the temporal dynamics of the model. Time in LENS is mind
+# bending. http://tedlab.mit.edu/~dr/Lens/time.html
+NetworkType: 'FEEDFORWARD'
+#intervals: 6
+#ticksPerInterval: 3
+
+# EXAMPLE FILE HEADER
+# ===================
+# This exactly echoes the standard header definitions for LENS example files
+# (http://tedlab.mit.edu/~dr/Lens/exampleFiles.html).
+#
+# N.B. '-' for a target means that error should not be computed. In otherwords,
+# if the default were zero, then the default objective of the network would be
+# to set the unit to zero. By setting defT to '-', the default activity is to
+# let the network evolve representations in an "unguided" way.
+header:
+    actI: 1
+    actT: 1
+    defI: 0
+    defT: 0
+#    grace: 0
+#    max: 2
+#    min: 2
+
+# WARM-START SPECIFICATIONS
+# =========================
+# Warm-starting is a way of biasing the semantic ouput representation into the
+# right part of semantic space. It is a way of handling homophones. The logic
+# that, in natural speech, the context strongly helps disambiguate among
+# homophones. Because this is model of single word comprehension, there is no
+# context of this kind. The warm-start solution is to take some number of
+# representations in the neighborhood of the target and average them together,
+# and inject them directly into the output layer. When the phonology arrives,
+# the goal is to then sharpen the semantic representation to correspond to a
+# single concept.
+#
+# OPTIONS
+# -------
+# distmethod: Here you can specify the distance metric, where your options are
+#     any of those available to scipy.spatial.distance.pdist, although since
+#     the semantic representations are binary there is a good argument for the
+#     Manhattan "cityblock" distance, which is basically just a count of how
+#     many units differ between representations.
+#
+#       braycurtis       -- the Bray-Curtis distance.
+#       canberra         -- the Canberra distance.
+#       chebyshev        -- the Chebyshev distance.
+# ***   cityblock        -- the Manhattan distance.   ***
+#       correlation      -- the Correlation distance.
+#       cosine           -- the Cosine distance.
+#       euclidean        -- the Euclidean distance.
+#       mahalanobis      -- the Mahalanobis distance.
+#       minkowski        -- the Minkowski distance.
+#       seuclidean       -- the normalized Euclidean distance.
+#       sqeuclidean      -- the squared Euclidean distance.
+#       wminkowski       -- the weighted Minkowski distance.
+#
+# knn (k-nearest neighbor) or radius: These mutually exclusive options define
+#     how to translate the distances into a selection of neighboring
+#     representations. Either select the N with the smallest distance, or
+#     select all those that fall within some radius. Note that an appropriate
+#     radius will depend on the distmethod. Each has pros and cons. KNN
+#     guarantees the number of representations being averaged is constant,
+#     while the radius method ensures that representations being averaged are
+#     not too dissimilar. I have tended to prefer the KNN approach, and have
+#     typically used 10 (an arbitrary choice, IIRC).
+#
+# name: This defines
+#warmstart:
+#    distmethod: cityblock
+#    knn: 10
+#    name: warmstart
+#    type: sem
+
+# INPUT AND TARGET KEYS
+# =====================
+# This bit serves an important but obtuse function. It defines a sort of
+# internal code for you to use when defining event structures. The gist is that
+# you need to create a unique code for each kind of input and target. For
+# instance, I am referring to the phonological input layer as ip and saying
+# that it will received patterns that are stored under the "phon" key within
+# the database. For a model with orthography, you would need to define
+# something like "io" under input and "to" under targets, and associate both
+# with the patterns stored under the "orth" key. As I said... obtuse, but
+# important.
+#
+# N.B. warmstart is sort of a "subtype" of semantic representation. So, you
+# need to tell the program to look inside sem to find warmstart. Think of it
+# like a directory structure:
+#
+#   ├── orth
+#   ├── phon
+#   └── sem
+#       └── warmstart
+input:
+    io: orth
+
+target:
+    tp: phon
+
+# EXAMPLE EVENT DESCRIPTIONS
+# ==========================
+# Here is an abstract means of coding events over the course of each example.
+# You can have different event descriptions associated with different kinds of
+# examples. This is a bit cryptic, so I'll try to be thorough...
+#
+# Under events, there is phon_sem and sem_phon. This indicates that there are
+# two kinds of example. The names phon_sem and sem_phon were chosen to be
+# descriptive (phon_sem intended to mean "learn to map from phonology to
+# semantics, and vice versa), but they are fundamentally arbitrary. The meaning
+# of phon_sem and sem_phon is defined at the next level down where there are
+# lists of key-value pairs.
+#
+# First note that each of these lists has three elements. That corresponds to
+# three events (where I am using the word events strictly in the LENS
+# vernacular (the primary references for understanding that are probably
+# http://tedlab.mit.edu/~dr/Lens/exampleFiles.html and
+# http://tedlab.mit.edu/~dr/Lens/time.html).
+#
+# Each event has a set of key-value pairs. You should recognize the keys from
+# the bit above (under the heading "INPUT AND TARGET KEYS"). Here, you can
+# reference each group of input or target units in play and indicate with a 0
+# or a 1 whether or not those inputs or targets should be "on".
+#
+# In the below, I specify the for the first event the input units should be on,
+# and on events 2 and 3 they should be off. The targets should be present
+# on all events. For phon_sem, the warmstart pattern should be on for the first
+# event, but off otherwise.
+#
+# You can have as many different kinds of example as you like, but the number
+# of events you define needs to be compatible with what you define under
+# "EXAMPLE FILE HEADER".
+events:
+  phon_orth:
+  - {io: 1, tp: 1}
+
+# LAYER DEFINITIONS
+# =================
+# These correspond closely to the "addGroup" LENS command
+# (http://tedlab.mit.edu/~dr/Lens/Commands/addGroup.html). This could probably
+# do with a bit more documentation, but hopefully it is straight forward enough
+# to intuit the basics.
+#
+# Here's an important caveat: the names have to be exactly these. When the
+# training script gets generated, I don't have a smart way of filling in the
+# names of the output layers dynamically. So it's important the PhonOutput
+#
+# For input layers, the number of units will be overwriten when input patterns
+# are actually obtained after querying the database. They can be left
+# explicitly empty [].
+layers:
+- {type: INPUT,  nunits:  [], biased: false, name: OrthInput }
+- {type: INPUT,  nunits:   1, biased: false, name: Context   }
+- {type: HIDDEN, nunits: 200, biased: false, name: Hidden    }
+- {type: OUTPUT, nunits: [], biased: true,  name: PhonOutput,  criterion: STANDARD_CRIT, errorType: CROSS_ENTROPY, useHistory: true, writeOutputs: true}
+
+# CONNECTION DEFINITIONS
+# ======================
+# These correspond closely to the connectGroups LENS command
+# (http://tedlab.mit.edu/~dr/Lens/Commands/connectGroups.html). Beneath the connections: key, there is a list of connections. Each list contains a set of three key-value pairs. Those keys are pattern, projection, and weights.
+#
+# - pattern: The expected value is a list of groups to connect. Technically,
+#     each element can itself be a list. Groups will be connected as described
+#     in the LENS documentation for the connectGroups command:
+#         "Each group in group-list1 will project to each group in the second
+#         group list. Those in the second list will project to those in the
+#         third and so on. By default this creates a full projection, but
+#         several patterns of sparse projections may also be specified."
+#
+# - projection: Can be one of either FULL, UNLESIONED, RANDOM, FIXED_IN,
+#     FIXED_OUT, FAIR, FAN, and ONE_TO_ONE. For sparse patterns (all those
+#     other than FULL, UNLEASIONED, and ONE_TO_ONE), the strength is a floating
+#     point number in the range [0,1] specifying the density of the
+#     connectivity, as described below. Strength is specified as a sub-field of
+#     the next key, "weights".
+#
+# - weights: This is kind of a catch all that includes sub-fields for each of the other parameters that might be set. Specifically:
+#    - bidirectional: true or false
+#    - mean: the mean value of the initial weight values
+#    - range: voxel weights will be randomized between mean-range and mean+range.
+#    - strength: This influences the number of weights projected between layers
+#        with RANDOM, FIXED_IN, FIXED_OUT, FAIR, and FAN projection types. It
+#        should only be used when defining connections that have one of those
+#        connection types.
+#
+connections:
+- pattern: [OrthInput, Hidden]
+  projection: FULL
+  weights: {bidirectional: false, mean: 0, range: 1}
+
+- pattern: [Hidden, PhonOutput]
+  projection: FULL
+  weights: {bidirectional: false, mean: 0, range: 1}
+
+- pattern: [Context, Hidden]
+  projection: FULL
+  weights: {bidirectional: false, mean: 0, range: 0}
+
+# YAML DESCRIPTION
+# ================
+# This file is specified as yaml, rather than in LENS specific terms, for
+# several reasons:
+#
+#  1. These data can be flexibly referenced and logged without needing to parse
+#     a non-standard script.
+#
+#  2. It can be converted into convenient structured data within any
+#     programming language with a yaml processor (such as Python, R, C/++,
+#     Perl, Ruby, and just about everything).
+#
+# The yaml format is very flexible, which is a blessing and a curse. The
+# specification is so comprehensive/elaborate/Byzantine that it is not worth
+# mastering in its entirety, but rather take what you need and keep it as
+# simple as possible. These are the basics:
+#
+#  - A string followed by a colon is a key, and the thing following the colon
+#    will be the value. So:
+#
+#      A: 1
+#
+#    sets the key A to contain the value 1. When parsed, it will yield a
+#    structure with the field A populated with the number 1.
+#
+#  - A value can be a scalar value, a string, a list, or a sub-branch of
+#    key-value pairs. So:
+#
+#      A: {a: [1,2,3], b: [4,5,6]}
+#
+#    Would be parsed as a structure with a field A, which contains a sub
+#    structure with two fields a and b, each containing a list of numbers.
+#
+#  - A value can also be a list of branches... I think you can see where this
+#    is going. You can make arbitrarily complex structures of lists and branches.
+#
+#  - The thing to keep in mind, though, is that there is more than one way to
+#    say the same thing in yaml. For instance, the example above could also be
+#    expressed as:
+#
+#      A:
+#        a:
+#          - 1
+#          - 2
+#          - 3
+#        b:
+#          - 4
+#          - 5
+#          - 6
+#
+#  - Throughout this file, I adopt the syntax that is most legible for me in
+#    context. But this means that the syntax varies.
+#
+#  - Fortunately, the yaml specification allows for comments! This is one of
+#    the largest advantages over json. I will attempt to make this file as
+#    clear as I can as an example for future network descriptions.
+#
+#  Best of luck,
+#   Chris
