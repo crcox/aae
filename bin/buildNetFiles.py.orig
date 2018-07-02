@@ -38,7 +38,6 @@ p.add_argument('-a','--accent',type=str,nargs='+',default=[])
 p.add_argument('-o','--output',type=str,default='train.ex')
 p.add_argument('-s','--sample_id',type=str,default=None)
 p.add_argument('-S','--sequential',action="store_true")
-p.add_argument('-J','--jitter',action="store_true")
 p.add_argument('-t','--test_sample_id',type=str,default=None)
 args = p.parse_args()
 
@@ -61,13 +60,7 @@ elif 'database' in CONFIG:
     DATABASE = CONFIG['database']
 else:
     DATABASE = pkg_resources.resource_filename(resource_package,'database/initial.db')
-
-if args.jitter:
-    JITTER = args.jitter
-elif 'database' in CONFIG:
-    JITTER = CONFIG['jitter']
-else:
-    JITTER = False
+print(DATABASE)
 
 dbname = os.path.basename(DATABASE)
 
@@ -171,6 +164,35 @@ if not SAMPLE_READ_FROM_CACHE or not TEST_SAMPLE_READ_FROM_CACHE:
     if not SAMPLE_READ_FROM_CACHE:
         SAMPLE = aae.sql.select.sample(conn, SAMPLE_ID, ACCENT_ID)
     if not TEST_SAMPLE_ID == SAMPLE_ID:
+<<<<<<< HEAD
+        TESTSAMPLE = dict((dialectLabel, dialectExamples)
+                for dialectLabel,dialectExamples in TESTSAMPLE.items()
+                if dialectLabel in DIALECT_SUBSET)
+
+if TEST_SAMPLE_ID == SAMPLE_ID:
+    SAMPLE, = aae.utils.prune_representations(SAMPLE)
+    TESTSAMPLE = SAMPLE
+else:
+    SAMPLE,TESTSAMPLE = aae.utils.prune_representations([SAMPLE,TESTSAMPLE])
+
+# Add "warmstart" data into the SAMPLE structures.
+if 'warmstart' in NETINFO and NETINFO['warmstart']:
+    WarmCfg = NETINFO['warmstart']
+    if all(True if k in WarmCfg.keys() else False for k in ['knn','ratio']):
+        print("knn and ratio cannot both be specified.")
+        raise ValueError
+    DIST = lensapi.examples.stimdist(SAMPLE,WarmCfg['type'],method=WarmCfg['distmethod'])
+    try:
+        SAMPLE = lensapi.examples.warmstart(SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],knn=WarmCfg['knn'])
+    except KeyError:
+        SAMPLE = lensapi.examples.warmstart(SAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
+
+    if not TEST_SAMPLE_ID == SAMPLE_ID:
+        try:
+            TESTSAMPLE = lensapi.examples.warmstart(TESTSAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],knn=WarmCfg['knn'])
+        except KeyError:
+            TESTSAMPLE = lensapi.examples.warmstart(TESTSAMPLE,DIST,WarmCfg['type'],WarmCfg['name'],ratio=WarmCfg['ratio'])
+=======
         if not TEST_SAMPLE_READ_FROM_CACHE:
             TEST_SAMPLE = aae.sql.select.sample(conn, TEST_SAMPLE_ID, ACCENT_ID)
 
@@ -190,14 +212,10 @@ if not SAMPLE_READ_FROM_CACHE or not TEST_SAMPLE_READ_FROM_CACHE:
 
     if TEST_SAMPLE_ID == SAMPLE_ID:
         if not SAMPLE_READ_FROM_CACHE:
-            if JITTER:
-                SAMPLE = aae.utils.jitter_representations(SAMPLE,12)
             SAMPLE = aae.utils.prune_representations(SAMPLE)
         TEST_SAMPLE = SAMPLE
     else:
         if not SAMPLE_READ_FROM_CACHE or not TEST_SAMPLE_READ_FROM_CACHE:
-            if JITTER:
-                [SAMPLE,TEST_SAMPLE] = aae.utils.jitter_representations(SAMPLE,12,TEST_SAMPLE)
             SAMPLE,TEST_SAMPLE = aae.utils.prune_representations([SAMPLE,TEST_SAMPLE])
 
     # Add "warmstart" data into the SAMPLE structures.
@@ -236,6 +254,7 @@ if CACHE_SAMPLE and not TEST_SAMPLE_READ_FROM_CACHE:
 
 end = timeit.default_timer()
 print("Time to load and preprocess sample: {elapsed:.3f}".format(elapsed=end - start))
+>>>>>>> sequential
 
 # Build and write representations
 if not os.path.isdir(EX_DIR):
